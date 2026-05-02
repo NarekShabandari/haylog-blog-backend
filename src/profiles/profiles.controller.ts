@@ -1,5 +1,6 @@
-import { Controller, Get, Query, Param, Post, Body } from '@nestjs/common';
+import { Controller, Get, Query, Param, Post, Body, Put } from '@nestjs/common';
 import { CreateProfileDto } from './dto/create-profile.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('profiles')
 export class ProfilesController {
@@ -18,6 +19,13 @@ export class ProfilesController {
     return {
       name: createProfileDto.name,
       description: createProfileDto.description,
+    };
+  }
+  @Put(':id')
+  update(@Param('id') id: string, @Body() updateProfileDto: UpdateProfileDto) {
+    return {
+      id,
+      ...updateProfileDto,
     };
   }
 }
