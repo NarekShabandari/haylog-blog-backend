@@ -20,7 +20,7 @@ export class ProfilesService {
   findOne(id: string) {
     const matchingProfile = this.profiles.find((profile) => profile.id === id);
     if (!matchingProfile) {
-      throw new NotFoundException(`Profile with id ${id} not found`);
+      throw new Error(`Profile with id ${id} not found`);
     }
     return matchingProfile;
   }

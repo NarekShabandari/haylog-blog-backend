@@ -8,6 +8,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -24,7 +25,11 @@ export class ProfilesController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.profilesService.findOne(id);
+    try {
+      return this.profilesService.findOne(id);
+    } catch (error) {
+      throw new NotFoundException(error.message);
+    }
   }
 
   @Post()
