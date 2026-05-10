@@ -40,7 +40,7 @@ export class ProfilesService {
     );
 
     if (!matchingProfile) {
-      return {};
+      throw new NotFoundException(`Profile with ID ${id} not found.`);
     }
 
     matchingProfile.name = updateProfileDto.name;
@@ -53,8 +53,9 @@ export class ProfilesService {
     const matchingProfileIndex = this.profiles.findIndex(
       (profile) => profile.id === id,
     );
-    if (matchingProfileIndex > -1) {
-      this.profiles.splice(matchingProfileIndex, 1);
+    if (matchingProfileIndex === -1) {
+      throw new NotFoundException(`Profile with ID ${id} not found.`);
     }
+    this.profiles.splice(matchingProfileIndex, 1);
   }
 }
