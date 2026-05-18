@@ -11,6 +11,10 @@ export class SongsController {
   }
   @Get()
   findAll() {
+    try {
+    } catch (error) {
+      console.log('Im in the catch block', error);
+    }
     return this.songsService.findAll();
   }
   @Get(':id')
