@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
     minlength: [8, "Password must be at least 8 characters"],
     select: false,
   },
+  refreshToken: {
+    type: String,
+    select: false, // never return it in queries
+  },
   createdAt: { type: Date, default: Date.now },
 });
 
