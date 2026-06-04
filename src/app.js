@@ -24,6 +24,8 @@ const globalRateLimiter = rateLimit({
   message: { error: "Too many requests" },
 });
 
+app.use(globalRateLimiter);
+
 const PORT = process.env.PORT || 3000;
 
 app.use((err, req, res, next) => {
