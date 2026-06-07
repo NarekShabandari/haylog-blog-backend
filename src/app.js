@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import authRoutes from "./routes/auth.routes";
 
 dotenv.config();
 
@@ -25,6 +26,8 @@ const globalRateLimiter = rateLimit({
 });
 
 app.use(globalRateLimiter);
+
+app.use("/auth", authRoutes);
 
 const PORT = process.env.PORT || 3000;
 
