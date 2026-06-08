@@ -1,4 +1,4 @@
-import { registerUser } from "../models/auth.model";
+import { loginUser, registerUser } from "../models/auth.model";
 
 export const register = async (req, res, next) => {
   try {
@@ -22,5 +22,21 @@ export const register = async (req, res, next) => {
     });
   } catch (error) {
     next(err);
+  }
+};
+
+export const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const { token, user } = await loginUser({ email, password });
+
+    res.status(200).json({ message: "Login successfull", token, user });
+  } catch (error) {
+    next(error);
   }
 };
