@@ -5,8 +5,6 @@ dotenv.config();
 
 const { Pool } = pg;
 
-console.log(process.env.DATABASE_URL);
-
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,
@@ -14,7 +12,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-pool.on("error", (err) => {
+pool.on("error", (err: Error) => {
   console.error("Unexpected DB error", err);
   process.exit(-1);
 });

@@ -1,4 +1,5 @@
-import pool from "../pool";
+import pool from "../pool.js";
+import { CreatePostInput, Post } from "../../types/index.js";
 
 export const createPost = async ({
   authorId,
@@ -6,8 +7,8 @@ export const createPost = async ({
   slug,
   content,
   published,
-}) => {
-  const { rows } = await pool.query(
+}: CreatePostInput): Promise<Post> => {
+  const { rows } = await pool.query<Post>(
     `INSERT INTO posts (author_id, title, slug, content, published)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *`,
@@ -16,8 +17,10 @@ export const createPost = async ({
   return rows[0];
 };
 
-export const getAllPosts = async ({ publishedOnly = true } = {}) => {
-  const { rows } = await pool.query(
+export const getAllPosts = async ({ publishedOnly = true } = {}): Promise<
+  Post[]
+> => {
+  const { rows } = await pool.query<Post>(
     `SELECT p.*, u.username AS author
         FROM posts p
         JOIN users u ON u.id = p.author.id
@@ -27,8 +30,8 @@ export const getAllPosts = async ({ publishedOnly = true } = {}) => {
   return rows;
 };
 
-export const getPostBySlug = async (slug) => {
-  const { rows } = await pool.query(
+export const getPostBySlug = async (slug: string): Promise<Post | null> => {
+  const { rows } = await pool.query<Post>(
     `SELECT p.*, us.username AS author
         FROM posts p
         JOIN users u ON u.id = p.author_id
@@ -38,9 +41,13 @@ export const getPostBySlug = async (slug) => {
   return rows[0] || null;
 };
 
-export const updatePost = async (id, authorId, fields) => {
+export const updatePost = async (
+  id: string,
+  authorId: string,
+  fields: Partial<Pick<Post, "title" | "content" | "published">>,
+) => {
   const { title, content, published } = fields;
-  const { rows } = await pool.query(
+  const { rows } = await pool.query<Post>(
     `UPDATE posts SET title=$1, content=$2, published=$3
     WHERE id=$4 AND author_id=$5
     RETURNING *`,
@@ -49,10 +56,13 @@ export const updatePost = async (id, authorId, fields) => {
   return rows[0] || null;
 };
 
-export const deletePost = async (id, authorId) => {
+export const deletePost = async (
+  id: string,
+  authorId: string,
+): Promise<boolean> => {
   const { rowCount } = await pool.query(
     `DELETE FROM posts WHERE id=$1 AND author_id=$2`,
     [id, authorId],
   );
-  return rowCount > 0;
+  return (rowCount ?? 0) > 0;
 };

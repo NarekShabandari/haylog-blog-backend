@@ -6,8 +6,16 @@ import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/auth.routes.js";
 import connectPgSimple from "connect-pg-simple";
 import session from "express-session";
+import { Request, Response, NextFunction } from "express";
+
+interface AppError extends Error {
+  status?: number;
+}
 
 dotenv.config();
+
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) throw new Error("SESSION_SECRET is not defined in .env");
 
 const app = express();
 
@@ -38,7 +46,7 @@ app.use(
       tableName: "sessions",
       createTableIfMissing: true, // auto creates the sessions table
     }),
-    secret: process.env.SESSION_SECRET,
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -53,7 +61,7 @@ app.use("/auth", authRoutes);
 
 const PORT = process.env.PORT || 3000;
 
-app.use((err, req, res, next) => {
+app.use((err: AppError, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
   const status = err.status || 500;
   const message =
