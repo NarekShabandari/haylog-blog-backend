@@ -1,4 +1,4 @@
-import { loginUser, registerUser } from "../models/auth.model";
+import { loginUser, registerUser } from "../models/auth.model.js";
 
 export const register = async (req, res, next) => {
   try {
@@ -16,12 +16,15 @@ export const register = async (req, res, next) => {
 
     const user = await registerUser({ email, username, password });
 
+    req.session.userId = user.id;
+    req.session.role = user.role;
+
     res.status(201).json({
       message: "User registered successfully",
       user,
     });
   } catch (error) {
-    next(err);
+    next(error);
   }
 };
 
@@ -35,8 +38,19 @@ export const login = async (req, res, next) => {
 
     const { token, user } = await loginUser({ email, password });
 
+    req.session.userId = user.id;
+    req.session.role = user.role;
+
     res.status(200).json({ message: "Login successfull", token, user });
   } catch (error) {
     next(error);
   }
+};
+
+export const logout = (req, res, next) => {
+  req.session.destroy((err) => {
+    if (err) return next(err);
+    res.clearCookie("connect.sid");
+    res.json({ message: "Logged out successfully" });
+  });
 };

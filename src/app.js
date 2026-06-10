@@ -3,11 +3,15 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import authRoutes from "./routes/auth.routes";
+import authRoutes from "./routes/auth.routes.js";
+import connectPgSimple from "connect-pg-simple";
+import session from "express-session";
 
 dotenv.config();
 
 const app = express();
+
+const PgSession = connectPgSimple(session);
 
 app.use(helmet());
 app.use(
@@ -26,6 +30,24 @@ const globalRateLimiter = rateLimit({
 });
 
 app.use(globalRateLimiter);
+
+app.use(
+  session({
+    store: new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: "sessions",
+      createTableIfMissing: true, // auto creates the sessions table
+    }),
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    },
+  }),
+);
 
 app.use("/auth", authRoutes);
 

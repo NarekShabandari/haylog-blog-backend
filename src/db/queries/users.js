@@ -1,4 +1,4 @@
-import pool from "../pool";
+import pool from "../pool.js";
 
 export const createUser = async ({ email, username, hashedPassword }) => {
   const { rows } = await pool.query(
