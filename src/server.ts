@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.routes.js";
 import connectPgSimple from "connect-pg-simple";
 import session from "express-session";
 import { Request, Response, NextFunction } from "express";
+import postRoutes from "./routes/post.routes.js";
 
 interface AppError extends Error {
   status?: number;
@@ -44,7 +45,7 @@ app.use(
     store: new PgSession({
       conString: process.env.DATABASE_URL,
       tableName: "sessions",
-      createTableIfMissing: true, // auto creates the sessions table
+      createTableIfMissing: true,
     }),
     secret: SESSION_SECRET,
     resave: false,
@@ -58,6 +59,7 @@ app.use(
 );
 
 app.use("/auth", authRoutes);
+app.use("/posts", postRoutes);
 
 const PORT = process.env.PORT || 3000;
 

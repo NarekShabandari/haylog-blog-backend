@@ -28,6 +28,7 @@ export interface CreatePostInput {
   slug: string;
   content: string;
   published?: boolean;
+  tags?: string[];
 }
 
 export interface Post {
@@ -37,6 +38,7 @@ export interface Post {
   slug: string;
   content: string;
   published: boolean;
+  tags: string[];
   created_at: Date;
   updated_at: Date;
   author?: string;

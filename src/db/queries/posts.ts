@@ -7,12 +7,13 @@ export const createPost = async ({
   slug,
   content,
   published,
+  tags = [],
 }: CreatePostInput): Promise<Post> => {
   const { rows } = await pool.query<Post>(
-    `INSERT INTO posts (author_id, title, slug, content, published)
-        VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO posts (author_id, title, slug, content, published, tags)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *`,
-    [authorId, title, slug, content, published ?? false],
+    [authorId, title, slug, content, published ?? false, tags],
   );
   return rows[0];
 };
