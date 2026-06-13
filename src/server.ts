@@ -8,6 +8,8 @@ import connectPgSimple from "connect-pg-simple";
 import session from "express-session";
 import { Request, Response, NextFunction } from "express";
 import postRoutes from "./routes/post.routes.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger.js";
 
 interface AppError extends Error {
   status?: number;
@@ -58,6 +60,7 @@ app.use(
   }),
 );
 
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/auth", authRoutes);
 app.use("/posts", postRoutes);
 
