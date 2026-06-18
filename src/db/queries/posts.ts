@@ -12,13 +12,14 @@ export const createPost = async ({
   content_hy = null,
   meta_description = null,
   meta_description_hy = null,
+  cover_image = null,
 }: CreatePostInput): Promise<Post> => {
   const { rows } = await pool.query<Post>(
     `INSERT INTO posts (
       author_id, title, slug, content, published, tags,
-      title_hy, content_hy, meta_description, meta_description_hy
+      title_hy, content_hy, meta_description, meta_description_hy, cover_image
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *`,
     [
       authorId,
@@ -31,6 +32,7 @@ export const createPost = async ({
       content_hy,
       meta_description,
       meta_description_hy,
+      cover_image,
     ],
   );
   return rows[0];

@@ -33,6 +33,7 @@ export interface CreatePostInput {
   content_hy?: string | null;
   meta_description?: string | null;
   meta_description_hy?: string | null;
+  cover_image?: string | null;
 }
 
 export interface Post {

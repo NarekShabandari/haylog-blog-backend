@@ -7,6 +7,7 @@ import {
 } from "../db/queries/posts.js";
 import { GeneratedPost, generatePost } from "../lib/anthropic.js";
 import { PostPromptInput } from "../lib/buildPostPrompt.js";
+import { generateCoverImage } from "../lib/generateImage.js";
 import { translateToArmenian } from "../lib/translate.js";
 import { CreatePostInput, Post } from "../types/index.js";
 
@@ -66,7 +67,10 @@ export const generateAndSavePost = async (
   input: PostPromptInput,
   published: boolean = false,
 ): Promise<Post> => {
-  const generated: GeneratedPost = await generatePost(input);
+  const [generated, cover_image] = await Promise.all([
+    generatePost(input),
+    generateCoverImage(input.topic),
+  ]);
 
   const translated = await translateToArmenian(
     generated.title,
@@ -85,5 +89,6 @@ export const generateAndSavePost = async (
     content_hy: translated.content_hy,
     meta_description: generated.metaDescription,
     meta_description_hy: translated.meta_description_hy,
+    cover_image,
   });
 };
