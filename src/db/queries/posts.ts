@@ -24,7 +24,7 @@ export const getAllPosts = async ({ publishedOnly = true } = {}): Promise<
   const { rows } = await pool.query<Post>(
     `SELECT p.*, u.username AS author
         FROM posts p
-        JOIN users u ON u.id = p.author.id
+        JOIN users u ON u.id = p.author_id
   ${publishedOnly ? "WHERE p.published = TRUE" : ""}
   ORDER BY p.created_at DESC`,
   );
