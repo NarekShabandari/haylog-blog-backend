@@ -34,10 +34,15 @@ export const generatePost = async (
     .map((block) => block.text)
     .join("");
 
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
   try {
-    const parsed: GeneratedPost = JSON.parse(raw);
+    const parsed: GeneratedPost = JSON.parse(cleaned);
     return parsed;
   } catch {
-    throw new Error(`Failed to parse AI response as JSON: ${raw}`);
+    throw new Error(`Failed to parse AI response as JSON: ${cleaned}`);
   }
 };
