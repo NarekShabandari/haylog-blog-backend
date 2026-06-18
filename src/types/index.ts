@@ -29,14 +29,22 @@ export interface CreatePostInput {
   content: string;
   published?: boolean;
   tags?: string[];
+  title_hy?: string | null;
+  content_hy?: string | null;
+  meta_description?: string | null;
+  meta_description_hy?: string | null;
 }
 
 export interface Post {
   id: string;
   author_id: string;
   title: string;
+  title_hy: string | null;
   slug: string;
   content: string;
+  content_hy: string | null;
+  meta_description: string | null;
+  meta_description_hy: string | null;
   published: boolean;
   tags: string[];
   created_at: Date;

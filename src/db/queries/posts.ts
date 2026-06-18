@@ -8,12 +8,30 @@ export const createPost = async ({
   content,
   published,
   tags = [],
+  title_hy = null,
+  content_hy = null,
+  meta_description = null,
+  meta_description_hy = null,
 }: CreatePostInput): Promise<Post> => {
   const { rows } = await pool.query<Post>(
-    `INSERT INTO posts (author_id, title, slug, content, published, tags)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *`,
-    [authorId, title, slug, content, published ?? false, tags],
+    `INSERT INTO posts (
+      author_id, title, slug, content, published, tags,
+      title_hy, content_hy, meta_description, meta_description_hy
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    RETURNING *`,
+    [
+      authorId,
+      title,
+      slug,
+      content,
+      published ?? false,
+      tags,
+      title_hy,
+      content_hy,
+      meta_description,
+      meta_description_hy,
+    ],
   );
   return rows[0];
 };

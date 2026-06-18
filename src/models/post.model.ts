@@ -7,6 +7,7 @@ import {
 } from "../db/queries/posts.js";
 import { GeneratedPost, generatePost } from "../lib/anthropic.js";
 import { PostPromptInput } from "../lib/buildPostPrompt.js";
+import { translateToArmenian } from "../lib/translate.js";
 import { CreatePostInput, Post } from "../types/index.js";
 
 const generateSlug = (title: string): string => {
@@ -67,6 +68,12 @@ export const generateAndSavePost = async (
 ): Promise<Post> => {
   const generated: GeneratedPost = await generatePost(input);
 
+  const translated = await translateToArmenian(
+    generated.title,
+    generated.content,
+    generated.metaDescription,
+  );
+
   return await createPost({
     authorId,
     title: generated.title,
@@ -74,5 +81,9 @@ export const generateAndSavePost = async (
     content: generated.content,
     published,
     tags: generated.tags,
+    title_hy: translated.title_hy,
+    content_hy: translated.content_hy,
+    meta_description: generated.metaDescription,
+    meta_description_hy: translated.meta_description_hy,
   });
 };
