@@ -53,12 +53,13 @@ export const getAllPosts = async ({ publishedOnly = true } = {}): Promise<
 
 export const getPostBySlug = async (slug: string): Promise<Post | null> => {
   const { rows } = await pool.query<Post>(
-    `SELECT p.*, us.username AS author
+    `SELECT p.*, u.username AS author
         FROM posts p
         JOIN users u ON u.id = p.author_id
         WHERE p.slug = $1`,
     [slug],
   );
+
   return rows[0] || null;
 };
 
