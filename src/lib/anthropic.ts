@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildPostPrompt, PostPromptInput } from "./buildPostPrompt.js";
+import {
+  buildPostPrompt,
+  PostPromptInput,
+} from "@narekshabandari/haylog-blog-prompts/dist/buildPostPrompt";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
