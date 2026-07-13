@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: haylog_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432" # expose for pgAdmin access from host
+    networks:
+      - haylog_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Express backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: haylog_backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db # ← points to the db service above
+      PORT: 3001
+    depends_on:
+      db:
+        condition: service_healthy # waits for DB to be ready
+    networks:
+      - haylog_network
+
+  # placeholder for frontend — add later
+  # frontend:
+  #   build:
+  #     context: ../blog-frontend
+  #     dockerfile: Dockerfile
+  #   container_name: haylog_frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - haylog_network
+
+networks:
+  haylog_network:
+    driver: bridge
+
+volumes:
+  postgres_data: # persists DB data between restarts
