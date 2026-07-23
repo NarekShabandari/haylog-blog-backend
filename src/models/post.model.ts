@@ -1,3 +1,4 @@
+import { generateCoverImagePrompt } from "@narekshabandari/haylog-blog-prompts/dist/generateImage.js";
 import {
   createPost,
   getAllPosts,
@@ -5,11 +6,10 @@ import {
   updatePost,
   deletePost,
 } from "../db/queries/posts.js";
-import { GeneratedPost, generatePost } from "../lib/anthropic.js";
-import { PostPromptInput } from "../lib/buildPostPrompt.js";
-import { generateCoverImage } from "../lib/generateImage.js";
-import { translateToArmenian } from "../lib/translate.js";
+import { generatePost } from "../lib/anthropic.js";
 import { CreatePostInput, Post } from "../types/index.js";
+import { translateToArmenian } from "@narekshabandari/haylog-blog-prompts/dist/translate.js";
+import { PostPromptInput } from "@narekshabandari/haylog-blog-prompts/dist/buildPostPrompt.js";
 
 const generateSlug = (title: string): string => {
   return title
@@ -69,7 +69,7 @@ export const generateAndSavePost = async (
 ): Promise<Post> => {
   const [generated, cover_image] = await Promise.all([
     generatePost(input),
-    generateCoverImage(input.topic),
+    generateCoverImagePrompt(input.topic),
   ]);
 
   const translated = await translateToArmenian(
