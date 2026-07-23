@@ -1,5 +1,5 @@
 {
-  "name": "spotify-clone-backend",
+  "name": "haylog-blog-backend",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,16 +10,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NarekShabandari/spotify-clone-backend.git"
+    "url": "git+https://github.com/NarekShabandari/haylog-blog-backend.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "bugs": {
-    "url": "https://github.com/NarekShabandari/spotify-clone-backend/issues"
+    "url": "https://github.com/NarekShabandari/haylog-blog-backend/issues"
   },
-  "homepage": "https://github.com/NarekShabandari/spotify-clone-backend#readme",
+  "homepage": "https://github.com/NarekShabandari/haylog-blog-backend#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "@narekshabandari/haylog-blog-prompts": "^1.0.0",
