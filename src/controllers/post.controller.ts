@@ -6,7 +6,7 @@ import {
   getPostBySlugModel,
   updatePostModel,
   generateAndSavePost,
-} from "../models/post.model";
+} from "../models/post.model.js";
 
 export const getAllPostsController = async (
   req: Request,
