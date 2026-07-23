@@ -5,15 +5,20 @@ FROM node:20-alpine
 WORKDIR /app
 
 ARG NPM_TOKEN
-ENV NPM_TOKEN=${NPM_TOKEN}
 
 
 # copy package files first for better caching
 COPY package*.json ./
-COPY .npmrc ./
+
+# create .npmrc dynamically using the build arg
+RUN echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > .npmrc && \
+    echo "@narekshabandari:registry=https://npm.pkg.github.com" >> .npmrc
 
 # install dependencies
 RUN npm ci
+
+# remove .npmrc so token is not in the image
+RUN rm -f .npmrc
 
 # copy source code
 COPY . .
