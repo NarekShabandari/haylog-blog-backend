@@ -1,8 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
-// using prompts from another repo
 import {
-  buildPostPrompt,
   PostPromptInput,
+  buildPostPrompt,
 } from "@narekshabandari/haylog-blog-prompts/dist/buildPostPrompt";
 
 const client = new Anthropic({
