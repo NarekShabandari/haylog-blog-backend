@@ -10,6 +10,7 @@ import { Request, Response, NextFunction } from "express";
 import postRoutes from "./routes/post.routes.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.js";
+import dbPool from "./db/pool.js";
 
 interface AppError extends Error {
   status?: number;
@@ -45,7 +46,7 @@ app.use(globalRateLimiter);
 app.use(
   session({
     store: new PgSession({
-      conString: process.env.DATABASE_URL,
+      pool: dbPool,
       tableName: "sessions",
       createTableIfMissing: true,
     }),
