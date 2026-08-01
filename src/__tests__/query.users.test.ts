@@ -11,6 +11,11 @@ import pool from "../db/pool.js";
 
 const poolQuery = vi.mocked(pool.query);
 
+/** Cast mock.calls[0] safely through unknown */
+function getCall(index = 0): [string, unknown[]] {
+  return poolQuery.mock.calls[index] as unknown as [string, unknown[]];
+}
+
 beforeEach(() => vi.clearAllMocks());
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,7 +30,7 @@ describe("createUser", () => {
     });
 
     expect(poolQuery).toHaveBeenCalledOnce();
-    const [sql, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = getCall();
     expect(sql).toMatch(/INSERT INTO users/i);
     expect(params).toEqual(["test@example.com", "testuser", "hashed_pw"]);
     expect(result).toEqual(mockUser);
@@ -40,7 +45,7 @@ describe("findUserByEmail", () => {
 
     const result = await findUserByEmail("test@example.com");
 
-    const [sql, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = getCall();
     expect(sql).toMatch(/SELECT \* FROM users WHERE email/i);
     expect(params).toEqual(["test@example.com"]);
     expect(result).toEqual(userWithPw);
@@ -62,7 +67,7 @@ describe("findUserById", () => {
 
     const result = await findUserById("user-uuid-1");
 
-    const [sql, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = getCall();
     expect(sql).toMatch(/SELECT .* FROM users WHERE id/i);
     expect(params).toEqual(["user-uuid-1"]);
     expect(result).toEqual(mockUser);

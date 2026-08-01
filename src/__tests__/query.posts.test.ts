@@ -17,6 +17,11 @@ import pool from "../db/pool.js";
 
 const poolQuery = vi.mocked(pool.query);
 
+/** Cast mock.calls[0] safely through unknown */
+function getCall(index = 0): [string, unknown[]] {
+  return poolQuery.mock.calls[index] as unknown as [string, unknown[]];
+}
+
 beforeEach(() => vi.clearAllMocks());
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,7 +39,7 @@ describe("createPost", () => {
     });
 
     expect(poolQuery).toHaveBeenCalledOnce();
-    const [sql, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = getCall();
     expect(sql).toMatch(/INSERT INTO posts/i);
     expect(params[0]).toBe("user-uuid-1");
     expect(params[1]).toBe("Test Post");
@@ -52,15 +57,13 @@ describe("createPost", () => {
       content: "body",
     });
 
-    const [, params] = poolQuery.mock.calls[0] as [string, unknown[]];
-    // tags default is []
-    expect(params[5]).toEqual([]);
-    // optional nullable fields default to null
-    expect(params[6]).toBeNull(); // title_hy
-    expect(params[7]).toBeNull(); // content_hy
-    expect(params[8]).toBeNull(); // meta_description
-    expect(params[9]).toBeNull(); // meta_description_hy
-    expect(params[10]).toBeNull(); // cover_image
+    const [, params] = getCall();
+    expect(params[5]).toEqual([]);    // tags default []
+    expect(params[6]).toBeNull();     // title_hy
+    expect(params[7]).toBeNull();     // content_hy
+    expect(params[8]).toBeNull();     // meta_description
+    expect(params[9]).toBeNull();     // meta_description_hy
+    expect(params[10]).toBeNull();    // cover_image
   });
 });
 
@@ -71,7 +74,7 @@ describe("getAllPosts", () => {
 
     const result = await getAllPosts();
 
-    const [sql] = poolQuery.mock.calls[0] as [string];
+    const [sql] = getCall();
     expect(sql).toMatch(/WHERE p\.published = TRUE/i);
     expect(result).toEqual([mockPost]);
   });
@@ -81,7 +84,7 @@ describe("getAllPosts", () => {
 
     await getAllPosts({ publishedOnly: false });
 
-    const [sql] = poolQuery.mock.calls[0] as [string];
+    const [sql] = getCall();
     expect(sql).not.toMatch(/WHERE p\.published/i);
   });
 
@@ -101,7 +104,7 @@ describe("getPostBySlug", () => {
 
     const result = await getPostBySlug("test-post");
 
-    const [sql, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = getCall();
     expect(sql).toMatch(/WHERE p\.slug = \$1/i);
     expect(params).toEqual(["test-post"]);
     expect(result).toEqual(mockPost);
@@ -127,7 +130,7 @@ describe("updatePost", () => {
       published: false,
     });
 
-    const [sql, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = getCall();
     expect(sql).toMatch(/UPDATE posts/i);
     expect(params).toEqual([
       "Updated",
@@ -159,7 +162,7 @@ describe("deletePost", () => {
 
     const result = await deletePost("post-uuid-1", "user-uuid-1");
 
-    const [sql, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = getCall();
     expect(sql).toMatch(/DELETE FROM posts/i);
     expect(params).toEqual(["post-uuid-1", "user-uuid-1"]);
     expect(result).toBe(true);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockPost } from "./helpers.js";
+import type { Post } from "../types/index.js";
 
 // ── Mock DB query layer ───────────────────────────────────────────────────────
 vi.mock("../db/queries/posts.js", () => ({
@@ -137,7 +138,7 @@ describe("updatePostModel", () => {
   });
 
   it("throws 'Post not found or not authorized' when update returns null", async () => {
-    updatePost.mockResolvedValue(null);
+    updatePost.mockResolvedValue(null as unknown as Post);
 
     await expect(
       updatePostModel("bad-id", "user-uuid-1", { title: "x" }),
