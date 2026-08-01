@@ -1,0 +1,313 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { buildReq, buildRes, buildNext, mockPost, mockUser } from "./helpers.js";
+
+// ── Mock the post model ───────────────────────────────────────────────────────
+vi.mock("../models/post.model.js", () => ({
+  getAllPostsModel: vi.fn(),
+  getPostBySlugModel: vi.fn(),
+  createPostModel: vi.fn(),
+  updatePostModel: vi.fn(),
+  deletePostModel: vi.fn(),
+  generateAndSavePost: vi.fn(),
+}));
+
+import {
+  getAllPostsController,
+  getMyPostsController,
+  getPostBySlugController,
+  createPostController,
+  updatePostController,
+  deletePostController,
+  generatePostController,
+} from "../controllers/post.controller.js";
+import * as postModel from "../models/post.model.js";
+
+const getAllPostsModel = vi.mocked(postModel.getAllPostsModel);
+const getPostBySlugModel = vi.mocked(postModel.getPostBySlugModel);
+const createPostModel = vi.mocked(postModel.createPostModel);
+const updatePostModel = vi.mocked(postModel.updatePostModel);
+const deletePostModel = vi.mocked(postModel.deletePostModel);
+const generateAndSavePost = vi.mocked(postModel.generateAndSavePost);
+
+beforeEach(() => vi.clearAllMocks());
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("getAllPostsController", () => {
+  it("returns 200 with published posts", async () => {
+    getAllPostsModel.mockResolvedValue([mockPost]);
+    const req = buildReq();
+    const res = buildRes();
+    const next = buildNext();
+
+    await getAllPostsController(req as any, res as any, next);
+
+    expect(getAllPostsModel).toHaveBeenCalledWith(); // default publishedOnly=true
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ posts: [mockPost] });
+  });
+
+  it("calls next on error", async () => {
+    const error = new Error("DB error");
+    getAllPostsModel.mockRejectedValue(error);
+
+    await getAllPostsController(buildReq() as any, buildRes() as any, buildNext());
+    // the next spy is the fourth argument — reconstruct cleanly
+    const next = buildNext();
+    getAllPostsModel.mockRejectedValue(error);
+    await getAllPostsController(buildReq() as any, buildRes() as any, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("getMyPostsController", () => {
+  it("fetches all posts (including drafts) for the logged-in user", async () => {
+    getAllPostsModel.mockResolvedValue([mockPost]);
+    const req = buildReq({ session: { user: mockUser } });
+    const res = buildRes();
+    const next = buildNext();
+
+    await getMyPostsController(req as any, res as any, next);
+
+    // called with false to include unpublished posts
+    expect(getAllPostsModel).toHaveBeenCalledWith(false);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ posts: [mockPost] });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("getPostBySlugController", () => {
+  it("returns 200 with the post when slug matches", async () => {
+    getPostBySlugModel.mockResolvedValue(mockPost);
+    const req = buildReq({ params: { slug: "test-post" } });
+    const res = buildRes();
+    const next = buildNext();
+
+    await getPostBySlugController(req as any, res as any, next);
+
+    expect(getPostBySlugModel).toHaveBeenCalledWith("test-post");
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ post: mockPost });
+  });
+
+  it("calls next when model throws (e.g. Post not found)", async () => {
+    const error = new Error("Post not found");
+    getPostBySlugModel.mockRejectedValue(error);
+    const next = buildNext();
+
+    await getPostBySlugController(
+      buildReq({ params: { slug: "missing" } }) as any,
+      buildRes() as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(error);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("createPostController", () => {
+  it("returns 400 when title or content is missing", async () => {
+    const req = buildReq({
+      body: { content: "body" }, // missing title
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await createPostController(req as any, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "Title and content are required",
+    });
+    expect(createPostModel).not.toHaveBeenCalled();
+  });
+
+  it("returns 201 with the created post", async () => {
+    createPostModel.mockResolvedValue(mockPost);
+    const req = buildReq({
+      body: { title: "Test Post", content: "Test content body", published: true },
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await createPostController(req as any, res as any, next);
+
+    expect(createPostModel).toHaveBeenCalledWith(mockUser.id, {
+      title: "Test Post",
+      content: "Test content body",
+      published: true,
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Post created successfully",
+      post: mockPost,
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("updatePostController", () => {
+  it("returns 400 when no updatable fields are provided", async () => {
+    const req = buildReq({
+      params: { id: "post-uuid-1" },
+      body: {},
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await updatePostController(req as any, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Nothing to update" });
+    expect(updatePostModel).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 with updated post", async () => {
+    updatePostModel.mockResolvedValue(mockPost);
+    const req = buildReq({
+      params: { id: "post-uuid-1" },
+      body: { title: "Updated", content: "new body" },
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await updatePostController(req as any, res as any, next);
+
+    expect(updatePostModel).toHaveBeenCalledWith(
+      "post-uuid-1",
+      mockUser.id,
+      { title: "Updated", content: "new body", published: undefined },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Post updated successfully",
+      post: mockPost,
+    });
+  });
+
+  it("calls next on model error", async () => {
+    updatePostModel.mockRejectedValue(new Error("Post not found or not authorized"));
+    const next = buildNext();
+
+    await updatePostController(
+      buildReq({
+        params: { id: "bad-id" },
+        body: { title: "x" },
+        session: { user: mockUser },
+      }) as any,
+      buildRes() as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("deletePostController", () => {
+  it("returns 200 on successful delete", async () => {
+    deletePostModel.mockResolvedValue(undefined);
+    const req = buildReq({
+      params: { id: "post-uuid-1" },
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await deletePostController(req as any, res as any, next);
+
+    expect(deletePostModel).toHaveBeenCalledWith("post-uuid-1", mockUser.id);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ message: "Post deleted successfully" });
+  });
+
+  it("calls next when model throws", async () => {
+    deletePostModel.mockRejectedValue(new Error("Post not found or not authorized"));
+    const next = buildNext();
+
+    await deletePostController(
+      buildReq({ params: { id: "bad-id" }, session: { user: mockUser } }) as any,
+      buildRes() as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("generatePostController", () => {
+  it("returns 400 when topic or targetKeyword is missing", async () => {
+    const req = buildReq({
+      body: { topic: "AI" }, // missing targetKeyword
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await generatePostController(req as any, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "topic and targetKeyword are required",
+    });
+    expect(generateAndSavePost).not.toHaveBeenCalled();
+  });
+
+  it("returns 201 with generated post", async () => {
+    generateAndSavePost.mockResolvedValue(mockPost);
+    const req = buildReq({
+      body: {
+        topic: "AI",
+        targetKeyword: "machine learning",
+        audience: "developers",
+        tone: "informative",
+        published: true,
+      },
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await generatePostController(req as any, res as any, next);
+
+    expect(generateAndSavePost).toHaveBeenCalledWith(
+      mockUser.id,
+      {
+        topic: "AI",
+        targetKeyword: "machine learning",
+        audience: "developers",
+        tone: "informative",
+      },
+      true,
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Post generated and saved successfully",
+      post: mockPost,
+    });
+  });
+
+  it("defaults published to false when not provided", async () => {
+    generateAndSavePost.mockResolvedValue(mockPost);
+    const req = buildReq({
+      body: { topic: "AI", targetKeyword: "ml" },
+      session: { user: mockUser },
+    });
+
+    await generatePostController(req as any, buildRes() as any, buildNext());
+
+    expect(generateAndSavePost).toHaveBeenCalledWith(
+      mockUser.id,
+      expect.anything(),
+      false,
+    );
+  });
+});
