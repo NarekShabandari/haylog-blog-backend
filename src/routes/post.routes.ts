@@ -9,6 +9,13 @@ import {
   generatePostController,
 } from "../controllers/post.controller.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
+import rateLimit from "express-rate-limit";
+
+const postCreationRateLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 1,
+  message: { error: "Too many generation requests" },
+});
 
 const router = Router();
 
@@ -114,7 +121,12 @@ router.get("/my", requireAuth, getMyPostsController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/generate", requireAuth, generatePostController);
+router.post(
+  "/generate",
+  requireAuth,
+  postCreationRateLimiter,
+  generatePostController,
+);
 
 /**
  * @swagger
@@ -196,7 +208,7 @@ router.get("/:slug", getPostBySlugController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/", requireAuth, createPostController);
+router.post("/", requireAuth, postCreationRateLimiter, createPostController);
 
 /**
  * @swagger
@@ -269,7 +281,12 @@ router.post("/", requireAuth, createPostController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.patch("/:id", requireAuth, updatePostController);
+router.patch(
+  "/:id",
+  requireAuth,
+  postCreationRateLimiter,
+  updatePostController,
+);
 router.delete("/:id", requireAuth, deletePostController);
 
 export default router;
