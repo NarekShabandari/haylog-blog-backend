@@ -208,7 +208,7 @@ router.get("/:slug", getPostBySlugController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/", requireAuth, postCreationRateLimiter, createPostController);
+// router.post("/", requireAuth, postCreationRateLimiter, createPostController);
 
 /**
  * @swagger
@@ -281,12 +281,12 @@ router.post("/", requireAuth, postCreationRateLimiter, createPostController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.patch(
-  "/:id",
-  requireAuth,
-  postCreationRateLimiter,
-  updatePostController,
-);
-router.delete("/:id", requireAuth, deletePostController);
+// router.patch(
+//   "/:id",
+//   requireAuth,
+//   postCreationRateLimiter,
+//   updatePostController,
+// );
+// router.delete("/:id", requireAuth, deletePostController);
 
 export default router;
