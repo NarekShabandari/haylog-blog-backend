@@ -7,6 +7,7 @@ import {
   updatePostModel,
   generateAndSavePost,
 } from "../models/post.model.js";
+import { sendApprovalRequest } from "../lib/telegram.js";
 
 export const getAllPostsController = async (
   req: Request,
@@ -128,11 +129,13 @@ export const generatePostController = async (
     const post = await generateAndSavePost(
       authorId,
       { topic, targetKeyword, audience, tone },
-      published ?? false,
+      false,
     );
 
+    await sendApprovalRequest(post.id, post.title, post.slug);
+
     res.status(201).json({
-      message: "Post generated and saved successfully",
+      message: "Post generated and sent for approval via Telegram",
       post,
     });
   } catch (err) {

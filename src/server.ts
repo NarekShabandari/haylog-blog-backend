@@ -11,6 +11,7 @@ import postRoutes from "./routes/post.routes.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.js";
 import dbPool from "./db/pool.js";
+import pool from "./db/pool.js";
 
 interface AppError extends Error {
   status?: number;
@@ -20,6 +21,7 @@ dotenv.config();
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) throw new Error("SESSION_SECRET is not defined in .env");
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 const app = express();
 
@@ -64,6 +66,40 @@ app.use(
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/auth", authRoutes);
 app.use("/posts", postRoutes);
+
+// Telegram calls this when you tap a button
+app.post("/telegram/webhook", async (req, res) => {
+  const { callback_query } = req.body;
+  if (!callback_query) return res.sendStatus(200);
+
+  const { data } = callback_query;
+  const [action, postId] = data.split("_");
+
+  if (action === "approve") {
+    await pool.query("UPDATE posts SET published = TRUE WHERE id = $1", [
+      postId,
+    ]);
+    await answerCallback(callback_query.id, "✅ Post approved and published!");
+  }
+
+  if (action === "reject") {
+    await pool.query("DELETE FROM posts WHERE id = $1", [postId]);
+    await answerCallback(callback_query.id, "❌ Post rejected and deleted.");
+  }
+
+  res.sendStatus(200);
+});
+
+const answerCallback = async (callbackId: string, text: string) => {
+  await fetch(
+    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callback_query_id: callbackId, text }),
+    },
+  );
+};
 
 const PORT = process.env.PORT || 3000;
 
