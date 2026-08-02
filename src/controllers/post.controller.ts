@@ -9,6 +9,16 @@ import {
 } from "../models/post.model.js";
 import { sendApprovalRequest } from "../lib/telegram.js";
 
+import { z } from "zod";
+
+const generateSchema = z.object({
+  topic: z.string().min(10).max(200),
+  targetKeyword: z.string().min(3).max(100),
+  audience: z.string().optional(),
+  tone: z.string().optional(),
+  published: z.boolean().optional(),
+});
+
 export const getAllPostsController = async (
   req: Request,
   res: Response,
@@ -116,7 +126,13 @@ export const generatePostController = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { topic, targetKeyword, audience, tone, published } = req.body;
+    const result = generateSchema.safeParse(req.body);
+    if (!result.success) {
+      // @ts-ignore
+      res.status(400).json({ error: result.error.errors });
+      return;
+    }
+    const { topic, targetKeyword, audience, tone, published } = result.data;
     const authorId = req.session.user!.id;
 
     if (!topic || !targetKeyword) {
