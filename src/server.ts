@@ -29,7 +29,16 @@ const app = express();
 const PgSession = connectPgSimple(session);
 
 app.use(morgan("combined"));
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        imgSrc: ["'self'", "res.cloudinary.com"],
+      },
+    },
+  }),
+);
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
