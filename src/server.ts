@@ -12,6 +12,7 @@ import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.js";
 import dbPool from "./db/pool.js";
 import pool from "./db/pool.js";
+import morgan from "morgan";
 
 interface AppError extends Error {
   status?: number;
@@ -27,6 +28,7 @@ const app = express();
 
 const PgSession = connectPgSimple(session);
 
+app.use(morgan("combined"));
 app.use(helmet());
 app.use(
   cors({
