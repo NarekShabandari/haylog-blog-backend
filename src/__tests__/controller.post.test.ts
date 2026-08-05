@@ -11,6 +11,11 @@ vi.mock("../models/post.model.js", () => ({
   generateAndSavePost: vi.fn(),
 }));
 
+// ── Mock telegram so no real HTTP calls are made ──────────────────────────────
+vi.mock("../lib/telegram.js", () => ({
+  sendApprovalRequest: vi.fn().mockResolvedValue(undefined),
+}));
+
 import {
   getAllPostsController,
   getMyPostsController,
@@ -244,9 +249,10 @@ describe("deletePostController", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("generatePostController", () => {
-  it("returns 400 when topic or targetKeyword is missing", async () => {
+  it("returns 400 with zod errors when topic is too short", async () => {
+    // zod requires topic min 10 chars, targetKeyword min 3 chars
     const req = buildReq({
-      body: { topic: "AI" }, // missing targetKeyword
+      body: { topic: "AI", targetKeyword: "ml" }, // both too short
       session: { user: mockUser },
     });
     const res = buildRes();
@@ -255,21 +261,21 @@ describe("generatePostController", () => {
     await generatePostController(req as any, res as any, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      error: "topic and targetKeyword are required",
-    });
+    // zod returns an array of errors, not a plain string
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Array) }),
+    );
     expect(generateAndSavePost).not.toHaveBeenCalled();
   });
 
-  it("returns 201 with generated post", async () => {
+  it("returns 201 and sends telegram approval on success", async () => {
     generateAndSavePost.mockResolvedValue(mockPost);
     const req = buildReq({
       body: {
-        topic: "AI",
+        topic: "AI and machine learning trends",
         targetKeyword: "machine learning",
         audience: "developers",
         tone: "informative",
-        published: true,
       },
       session: { user: mockUser },
     });
@@ -281,33 +287,33 @@ describe("generatePostController", () => {
     expect(generateAndSavePost).toHaveBeenCalledWith(
       mockUser.id,
       {
-        topic: "AI",
+        topic: "AI and machine learning trends",
         targetKeyword: "machine learning",
         audience: "developers",
         tone: "informative",
       },
-      true,
+      false, // always false — published via telegram approval
     );
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
-      message: "Post generated and saved successfully",
+      message: "Post generated and sent for approval via Telegram",
       post: mockPost,
     });
   });
 
-  it("defaults published to false when not provided", async () => {
-    generateAndSavePost.mockResolvedValue(mockPost);
+  it("calls next on error when generateAndSavePost throws", async () => {
+    generateAndSavePost.mockRejectedValue(new Error("AI error"));
     const req = buildReq({
-      body: { topic: "AI", targetKeyword: "ml" },
+      body: {
+        topic: "AI and machine learning trends",
+        targetKeyword: "machine learning",
+      },
       session: { user: mockUser },
     });
+    const next = buildNext();
 
-    await generatePostController(req as any, buildRes() as any, buildNext());
+    await generatePostController(req as any, buildRes() as any, next);
 
-    expect(generateAndSavePost).toHaveBeenCalledWith(
-      mockUser.id,
-      expect.anything(),
-      false,
-    );
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
   });
 });

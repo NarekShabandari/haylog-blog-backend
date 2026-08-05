@@ -3,6 +3,12 @@ import request from "supertest";
 import { buildApp } from "./app.js";
 import { mockPost, mockUser } from "../helpers.js";
 
+// Disable rate limiting so tests never hit 429
+vi.mock("express-rate-limit", () => ({
+  default: () => (_req: any, _res: any, next: any) => next(),
+  rateLimit: () => (_req: any, _res: any, next: any) => next(),
+}));
+
 // ── Mock both models so no DB is touched ─────────────────────────────────────
 vi.mock("../../models/auth.model.js", () => ({
   registerUser: vi.fn(),
@@ -16,6 +22,11 @@ vi.mock("../../models/post.model.js", () => ({
   updatePostModel: vi.fn(),
   deletePostModel: vi.fn(),
   generateAndSavePost: vi.fn(),
+}));
+
+// ── Mock telegram so no real HTTP calls are made ──────────────────────────────
+vi.mock("../../lib/telegram.js", () => ({
+  sendApprovalRequest: vi.fn().mockResolvedValue(undefined),
 }));
 
 import * as authModel from "../../models/auth.model.js";
@@ -226,22 +237,21 @@ describe("POST /posts/generate", () => {
   it("returns 401 when not authenticated", async () => {
     const res = await request(buildApp())
       .post("/posts/generate")
-      .send({ topic: "AI", targetKeyword: "ml" });
+      .send({ topic: "AI and machine learning trends", targetKeyword: "machine learning" });
 
     expect(res.status).toBe(401);
   });
 
-  it("returns 400 when topic or targetKeyword is missing", async () => {
+  it("returns 400 when topic or targetKeyword fail zod validation", async () => {
     const agent = await loggedInAgent();
 
+    // topic too short (min 10), targetKeyword too short (min 3)
     const res = await agent
       .post("/posts/generate")
-      .send({ topic: "AI" }); // missing targetKeyword
+      .send({ topic: "AI", targetKeyword: "ml" });
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({
-      error: "topic and targetKeyword are required",
-    });
+    expect(res.body.error).toBeInstanceOf(Array);
   });
 
   it("returns 201 with the generated post", async () => {
@@ -249,7 +259,7 @@ describe("POST /posts/generate", () => {
     const agent = await loggedInAgent();
 
     const res = await agent.post("/posts/generate").send({
-      topic: "AI",
+      topic: "AI and machine learning trends",
       targetKeyword: "machine learning",
       audience: "developers",
       tone: "informative",
@@ -257,7 +267,7 @@ describe("POST /posts/generate", () => {
 
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
-      message: "Post generated and saved successfully",
+      message: "Post generated and sent for approval via Telegram",
       post: expect.objectContaining({ id: mockPost.id }),
     });
   });

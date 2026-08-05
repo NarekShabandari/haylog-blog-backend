@@ -128,8 +128,7 @@ export const generatePostController = async (
   try {
     const result = generateSchema.safeParse(req.body);
     if (!result.success) {
-      // @ts-ignore
-      res.status(400).json({ error: result.error.errors });
+      res.status(400).json({ error: result.error.issues });
       return;
     }
     const { topic, targetKeyword, audience, tone, published } = result.data;
