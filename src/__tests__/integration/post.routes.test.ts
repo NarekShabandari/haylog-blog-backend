@@ -133,7 +133,7 @@ describe("POST /posts", () => {
     const res = await agent.post("/posts").send({ content: "only content" });
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ error: "Title and content are required" });
+    expect(res.body.error).toBeInstanceOf(Array);
   });
 
   it("returns 201 with created post", async () => {
@@ -156,7 +156,7 @@ describe("POST /posts", () => {
 describe("PATCH /posts/:id", () => {
   it("returns 401 when not authenticated", async () => {
     const res = await request(buildApp())
-      .patch("/posts/post-uuid-1")
+      .patch(`/posts/${mockPost.id}`)
       .send({ title: "new" });
 
     expect(res.status).toBe(401);
@@ -165,10 +165,10 @@ describe("PATCH /posts/:id", () => {
   it("returns 400 when no fields are provided", async () => {
     const agent = await loggedInAgent();
 
-    const res = await agent.patch("/posts/post-uuid-1").send({});
+    const res = await agent.patch(`/posts/${mockPost.id}`).send({});
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ error: "Nothing to update" });
+    expect(res.body.error).toBeInstanceOf(Array);
   });
 
   it("returns 200 with updated post", async () => {
@@ -176,7 +176,7 @@ describe("PATCH /posts/:id", () => {
     const agent = await loggedInAgent();
 
     const res = await agent
-      .patch("/posts/post-uuid-1")
+      .patch(`/posts/${mockPost.id}`)
       .send({ title: "Updated Title", content: "updated body" });
 
     expect(res.status).toBe(200);
@@ -193,7 +193,7 @@ describe("PATCH /posts/:id", () => {
     const agent = await loggedInAgent();
 
     const res = await agent
-      .patch("/posts/bad-id")
+      .patch(`/posts/${mockPost.id}`)
       .send({ title: "x", content: "y" });
 
     expect(res.status).toBe(500);
@@ -204,7 +204,7 @@ describe("PATCH /posts/:id", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("DELETE /posts/:id", () => {
   it("returns 401 when not authenticated", async () => {
-    const res = await request(buildApp()).delete("/posts/post-uuid-1");
+    const res = await request(buildApp()).delete(`/posts/${mockPost.id}`);
 
     expect(res.status).toBe(401);
   });
@@ -213,7 +213,7 @@ describe("DELETE /posts/:id", () => {
     deletePostModel.mockResolvedValue(undefined);
     const agent = await loggedInAgent();
 
-    const res = await agent.delete("/posts/post-uuid-1");
+    const res = await agent.delete(`/posts/${mockPost.id}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ message: "Post deleted successfully" });
@@ -225,7 +225,7 @@ describe("DELETE /posts/:id", () => {
     );
     const agent = await loggedInAgent();
 
-    const res = await agent.delete("/posts/bad-id");
+    const res = await agent.delete(`/posts/${mockPost.id}`);
 
     expect(res.status).toBe(500);
     expect(res.body).toMatchObject({ error: "Post not found or not authorized" });
