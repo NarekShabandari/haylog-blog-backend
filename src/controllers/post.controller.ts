@@ -19,6 +19,30 @@ const generateSchema = z.object({
   published: z.boolean().optional(),
 });
 
+const slugParamSchema = z.object({
+  slug: z.string().min(1),
+});
+
+const idParamSchema = z.object({
+  id: z.string().uuid(),
+});
+
+const createPostSchema = z.object({
+  title: z.string().min(1).max(500),
+  content: z.string().min(1),
+  published: z.boolean().optional(),
+});
+
+const updatePostSchema = z
+  .object({
+    title: z.string().min(1).max(500).optional(),
+    content: z.string().min(1).optional(),
+    published: z.boolean().optional(),
+  })
+  .refine((data) => data.title !== undefined || data.content !== undefined || data.published !== undefined, {
+    message: "Nothing to update",
+  });
+
 export const getAllPostsController = async (
   req: Request,
   res: Response,
@@ -51,8 +75,13 @@ export const getPostBySlugController = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { slug } = req.params;
-    const post = await getPostBySlugModel(slug as string);
+    const result = slugParamSchema.safeParse(req.params);
+    if (!result.success) {
+      res.status(400).json({ error: result.error.issues });
+      return;
+    }
+    const { slug } = result.data;
+    const post = await getPostBySlugModel(slug);
     res.status(200).json({ post });
   } catch (err) {
     next(err);
@@ -65,12 +94,13 @@ export const createPostController = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { title, content, published } = req.body;
-    const authorId = req.session.user!.id;
-    if (!title || !content) {
-      res.status(400).json({ error: "Title and content are required" });
+    const result = createPostSchema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({ error: result.error.issues });
       return;
     }
+    const { title, content, published } = result.data;
+    const authorId = req.session.user!.id;
     const post = await createPostModel(authorId, { title, content, published });
     res.status(201).json({ message: "Post created successfully", post });
   } catch (error) {
@@ -84,16 +114,23 @@ export const updatePostController = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
-    const authorId = req.session.user!.id;
-    const { title, content, published } = req.body;
-
-    if (!title && !content && published === undefined) {
-      res.status(400).json({ error: "Nothing to update" });
+    const paramsResult = idParamSchema.safeParse(req.params);
+    if (!paramsResult.success) {
+      res.status(400).json({ error: paramsResult.error.issues });
       return;
     }
 
-    const post = await updatePostModel(id as string, authorId, {
+    const bodyResult = updatePostSchema.safeParse(req.body);
+    if (!bodyResult.success) {
+      res.status(400).json({ error: bodyResult.error.issues });
+      return;
+    }
+
+    const { id } = paramsResult.data;
+    const { title, content, published } = bodyResult.data;
+    const authorId = req.session.user!.id;
+
+    const post = await updatePostModel(id, authorId, {
       title,
       content,
       published,
@@ -110,10 +147,15 @@ export const deletePostController = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const result = idParamSchema.safeParse(req.params);
+    if (!result.success) {
+      res.status(400).json({ error: result.error.issues });
+      return;
+    }
+    const { id } = result.data;
     const authorId = req.session.user!.id;
 
-    await deletePostModel(id as string, authorId);
+    await deletePostModel(id, authorId);
     res.status(200).json({ message: "Post deleted successfully" });
   } catch (err) {
     next(err);

@@ -4,7 +4,7 @@ import type { User, Post } from "../types/index.js";
 // ─── Shared mock data ────────────────────────────────────────────────────────
 
 export const mockUser: User = {
-  id: "user-uuid-1",
+  id: "b2c3d4e5-f6a7-4890-bcde-f12345678901",
   email: "test@example.com",
   username: "testuser",
   created_at: new Date("2024-01-01T00:00:00Z"),
@@ -16,8 +16,8 @@ export const mockUserWithPassword = {
 };
 
 export const mockPost: Post = {
-  id: "post-uuid-1",
-  author_id: "user-uuid-1",
+  id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890",
+  author_id: "b2c3d4e5-f6a7-4890-bcde-f12345678901",
   title: "Test Post",
   title_hy: null,
   slug: "test-post",

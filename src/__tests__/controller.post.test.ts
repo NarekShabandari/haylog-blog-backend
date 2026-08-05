@@ -125,9 +125,9 @@ describe("createPostController", () => {
     await createPostController(req as any, res as any, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      error: "Title and content are required",
-    });
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Array) }),
+    );
     expect(createPostModel).not.toHaveBeenCalled();
   });
 
@@ -159,7 +159,7 @@ describe("createPostController", () => {
 describe("updatePostController", () => {
   it("returns 400 when no updatable fields are provided", async () => {
     const req = buildReq({
-      params: { id: "post-uuid-1" },
+      params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
       body: {},
       session: { user: mockUser },
     });
@@ -169,14 +169,16 @@ describe("updatePostController", () => {
     await updatePostController(req as any, res as any, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: "Nothing to update" });
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Array) }),
+    );
     expect(updatePostModel).not.toHaveBeenCalled();
   });
 
   it("returns 200 with updated post", async () => {
     updatePostModel.mockResolvedValue(mockPost);
     const req = buildReq({
-      params: { id: "post-uuid-1" },
+      params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
       body: { title: "Updated", content: "new body" },
       session: { user: mockUser },
     });
@@ -186,7 +188,7 @@ describe("updatePostController", () => {
     await updatePostController(req as any, res as any, next);
 
     expect(updatePostModel).toHaveBeenCalledWith(
-      "post-uuid-1",
+      "a1b2c3d4-e5f6-4789-abcd-ef1234567890",
       mockUser.id,
       { title: "Updated", content: "new body", published: undefined },
     );
@@ -203,7 +205,7 @@ describe("updatePostController", () => {
 
     await updatePostController(
       buildReq({
-        params: { id: "bad-id" },
+        params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
         body: { title: "x" },
         session: { user: mockUser },
       }) as any,
@@ -220,7 +222,7 @@ describe("deletePostController", () => {
   it("returns 200 on successful delete", async () => {
     deletePostModel.mockResolvedValue(undefined);
     const req = buildReq({
-      params: { id: "post-uuid-1" },
+      params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
       session: { user: mockUser },
     });
     const res = buildRes();
@@ -228,7 +230,7 @@ describe("deletePostController", () => {
 
     await deletePostController(req as any, res as any, next);
 
-    expect(deletePostModel).toHaveBeenCalledWith("post-uuid-1", mockUser.id);
+    expect(deletePostModel).toHaveBeenCalledWith("a1b2c3d4-e5f6-4789-abcd-ef1234567890", mockUser.id);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ message: "Post deleted successfully" });
   });
@@ -238,7 +240,7 @@ describe("deletePostController", () => {
     const next = buildNext();
 
     await deletePostController(
-      buildReq({ params: { id: "bad-id" }, session: { user: mockUser } }) as any,
+      buildReq({ params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" }, session: { user: mockUser } }) as any,
       buildRes() as any,
       next,
     );
