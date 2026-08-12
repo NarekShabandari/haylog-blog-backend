@@ -111,6 +111,55 @@ describe("POST /auth/login", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe("GET /auth/me", () => {
+  it("returns 401 when no session is active", async () => {
+    // Fresh request with no session cookie — should be rejected immediately
+    const res = await request(app).get("/auth/me");
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ error: "Unauthorized" });
+  });
+
+  it("returns 200 and the user object when a session is active", async () => {
+    // Establish a session by logging in first, then hit /me on the same agent
+    loginUser.mockResolvedValue(mockUser);
+    const agent = request.agent(app); // agent persists cookies between requests
+
+    await agent
+      .post("/auth/login")
+      .send({ email: "test@example.com", password: "password123" });
+
+    const res = await agent.get("/auth/me");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      user: {
+        id: mockUser.id,
+        email: mockUser.email,
+        username: mockUser.username,
+      },
+    });
+  });
+
+  it("returns 401 after logging out (session is destroyed)", async () => {
+    // Log in → log out → /me should no longer find a user in session
+    loginUser.mockResolvedValue(mockUser);
+    const agent = request.agent(app);
+
+    await agent
+      .post("/auth/login")
+      .send({ email: "test@example.com", password: "password123" });
+
+    await agent.post("/auth/logout");
+
+    const res = await agent.get("/auth/me");
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ error: "Unauthorized" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe("POST /auth/logout", () => {
   it("returns 200 and clears session", async () => {
     // First log in to establish a session

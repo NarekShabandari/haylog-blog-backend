@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, logout } from "../controllers/auth.controller.js";
+import { register, login, logout, me } from "../controllers/auth.controller.js";
 
 const router = Router();
 
@@ -115,5 +115,33 @@ router.post("/login", login);
  *               $ref: '#/components/schemas/Error'
  */
 router.post("/logout", logout);
+
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get the currently authenticated user
+ *     description: Returns the user object stored in the active session. Requires an active session cookie.
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: The authenticated user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: No active session — user is not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: Unauthorized
+ */
+router.get("/me", me);
 
 export default router;
