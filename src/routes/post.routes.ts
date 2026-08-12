@@ -124,7 +124,7 @@ router.get("/my", requireAuth, getMyPostsController);
 router.post(
   "/generate",
   requireAuth,
-  postCreationRateLimiter,
+  // postCreationRateLimiter,
   generatePostController,
 );
 
