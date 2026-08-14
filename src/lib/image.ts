@@ -1,4 +1,4 @@
-import { generateCoverImagePrompt } from "@narekshabandari/haylog-blog-prompts/dist/generateImage";
+import { generateCoverImagePrompt } from "@narekshabandari/haylog-blog-prompts/dist/generateImage.js";
 
 export const generateCoverImage = async (
   title: string,
