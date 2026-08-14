@@ -1,33 +1,69 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// ── Mock the external prompt generator ────────────────────────────────────────
-// We isolate `generateCoverImage` from the blogPrompts package entirely.
-// This ensures the test only validates image.ts logic, not the prompt builder.
+// ── Mock: external prompt generator ──────────────────────────────────────────
+// Isolates image.ts from the blogPrompts package entirely so this test suite
+// only exercises the Stability AI → Cloudinary pipeline.
 vi.mock("@narekshabandari/haylog-blog-prompts/dist/generateImage", () => ({
   generateCoverImagePrompt: vi.fn(),
 }));
 
+// ── Mock: Cloudinary config module ────────────────────────────────────────────
+// The config/cloudinary.ts module throws at import time when env vars are
+// missing.  We replace the whole module with a pre-configured spy object so
+// tests never need real credentials and never hit the network.
+vi.mock("../config/cloudinary.js", () => ({
+  default: {
+    uploader: {
+      upload: vi.fn(),
+    },
+  },
+}));
+
 import { generateCoverImage } from "../lib/image.js";
 import * as generateImageModule from "@narekshabandari/haylog-blog-prompts/dist/generateImage";
+import cloudinary from "../config/cloudinary.js";
 
-const generateCoverImagePrompt = vi.mocked(generateImageModule.generateCoverImagePrompt);
+const mockGenerateCoverImagePrompt = vi.mocked(
+  generateImageModule.generateCoverImagePrompt,
+);
+const mockCloudinaryUpload = vi.mocked(cloudinary.uploader.upload);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Build a minimal Response-like object that fetch returns. */
-function buildFetchResponse(ok: boolean, status = 200, statusText = "OK"): Response {
+/**
+ * Builds a minimal Response-like object that mimics the global fetch response.
+ * The `arrayBuffer` method returns a buffer of N zero-bytes, which is enough
+ * for image.ts to construct a base64 string without decoding anything real.
+ */
+function buildStabilityResponse(
+  ok: boolean,
+  status = 200,
+  statusText = "OK",
+  bodyBytes = 4,
+): Response {
   return {
     ok,
     status,
     statusText,
+    arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(bodyBytes)),
+    json: vi.fn().mockResolvedValue({ message: "error from stability" }),
   } as unknown as Response;
+}
+
+/** Minimal Cloudinary upload result containing only the field image.ts uses. */
+const FAKE_SECURE_URL = "https://res.cloudinary.com/demo/image/upload/blog-covers/abc123.webp";
+
+function buildCloudinaryResult(secureUrl = FAKE_SECURE_URL) {
+  return { secure_url: secureUrl } as unknown as Awaited<
+    ReturnType<typeof cloudinary.uploader.upload>
+  >;
 }
 
 // ── Setup / Teardown ──────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Stub global fetch so no real HTTP requests are ever made.
+  // Stub global fetch — no real HTTP requests are ever made.
   vi.stubGlobal("fetch", vi.fn());
 });
 
@@ -40,151 +76,232 @@ describe("generateCoverImage", () => {
   // ── Happy path ──────────────────────────────────────────────────────────────
 
   describe("when everything succeeds", () => {
-    it("returns the correct pollinations.ai URL for a given title", async () => {
-      const prompt = "minimalist tech blog cover for AI article";
-      generateCoverImagePrompt.mockResolvedValue(prompt);
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(true));
+    it("returns the Cloudinary secure_url", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
 
-      const result = await generateCoverImage("AI and the Future");
+      const result = await generateCoverImage("My Blog Post");
 
-      const encoded = encodeURIComponent(prompt);
-      expect(result).toBe(
-        `https://image.pollinations.ai/prompt/${encoded}?width=1200&height=630&nologo=true`,
-      );
-    });
-
-    it("uses the default width (1200) and height (630) when no dimensions are provided", async () => {
-      const prompt = "some prompt";
-      generateCoverImagePrompt.mockResolvedValue(prompt);
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(true));
-
-      const result = await generateCoverImage("My Title");
-
-      expect(result).toContain("width=1200");
-      expect(result).toContain("height=630");
-    });
-
-    it("respects custom width and height overrides", async () => {
-      const prompt = "some prompt";
-      generateCoverImagePrompt.mockResolvedValue(prompt);
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(true));
-
-      const result = await generateCoverImage("My Title", 800, 400);
-
-      expect(result).toContain("width=800");
-      expect(result).toContain("height=400");
-    });
-
-    it("always appends nologo=true to suppress the watermark", async () => {
-      generateCoverImagePrompt.mockResolvedValue("a prompt");
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(true));
-
-      const result = await generateCoverImage("No Logo Test");
-
-      expect(result).toContain("nologo=true");
-    });
-
-    it("URL-encodes the prompt so special characters are safe in the URL", async () => {
-      // A prompt with spaces, commas, and ampersands would break a raw URL.
-      const prompt = "dark & moody, high contrast image/photo";
-      generateCoverImagePrompt.mockResolvedValue(prompt);
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(true));
-
-      const result = await generateCoverImage("Some Title");
-
-      expect(result).toContain(encodeURIComponent(prompt));
-      // The raw characters must NOT appear un-encoded in the URL path segment.
-      expect(result).not.toContain(" ");
-      expect(result).not.toContain("&moody"); // '&' before 'moody' would break query parsing
+      expect(result).toBe(FAKE_SECURE_URL);
     });
 
     it("passes the post title to generateCoverImagePrompt", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(true));
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
 
       await generateCoverImage("Deep Learning Explained");
 
-      expect(generateCoverImagePrompt).toHaveBeenCalledOnce();
-      expect(generateCoverImagePrompt).toHaveBeenCalledWith("Deep Learning Explained");
+      expect(mockGenerateCoverImagePrompt).toHaveBeenCalledOnce();
+      expect(mockGenerateCoverImagePrompt).toHaveBeenCalledWith(
+        "Deep Learning Explained",
+      );
     });
 
-    it("calls fetch exactly once with the constructed URL", async () => {
-      const prompt = "my prompt";
-      generateCoverImagePrompt.mockResolvedValue(prompt);
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(true));
+    it("calls the Stability AI endpoint exactly once", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
 
       await generateCoverImage("Once Only");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-      expect(calledUrl).toContain("https://image.pollinations.ai/prompt/");
+    });
+
+    it("sends the request to the correct Stability AI v2beta endpoint", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
+
+      await generateCoverImage("Endpoint Check");
+
+      const [url] = vi.mocked(fetch).mock.calls[0];
+      expect(url).toBe(
+        "https://api.stability.ai/v2beta/stable-image/generate/core",
+      );
+    });
+
+    it("sends a POST request with the Bearer token in the Authorization header", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
+
+      await generateCoverImage("Auth Check");
+
+      const [, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+      expect(options.method).toBe("POST");
+      expect((options.headers as Record<string, string>)["Authorization"]).toBe(
+        "Bearer test-stability-key",
+      );
+    });
+
+    it("requests image/* in the Accept header so Stability returns raw bytes", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
+
+      await generateCoverImage("Accept Header Check");
+
+      const [, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+      expect((options.headers as Record<string, string>)["Accept"]).toBe("image/*");
+    });
+
+    it("uploads to Cloudinary under the blog-covers folder", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
+
+      await generateCoverImage("Folder Check");
+
+      const [, options] = mockCloudinaryUpload.mock.calls[0];
+      expect(options?.folder).toBe("blog-covers");
+    });
+
+    it("uploads a base64-encoded webp data URI to Cloudinary", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
+
+      await generateCoverImage("Base64 Check");
+
+      const [dataUri] = mockCloudinaryUpload.mock.calls[0];
+      expect(dataUri).toMatch(/^data:image\/webp;base64,/);
+    });
+
+    it("applies the correct Cloudinary transformation (1200x675 fill, auto quality, auto format)", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
+
+      await generateCoverImage("Transformation Check");
+
+      const [, options] = mockCloudinaryUpload.mock.calls[0];
+      expect(options?.transformation).toEqual([
+        { width: 1200, height: 675, crop: "fill" },
+        { quality: "auto" },
+        { fetch_format: "auto" },
+      ]);
+    });
+
+    it("calls Cloudinary upload exactly once per invocation", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockResolvedValue(buildCloudinaryResult());
+
+      await generateCoverImage("Upload Count");
+
+      expect(mockCloudinaryUpload).toHaveBeenCalledOnce();
     });
   });
 
-  // ── HTTP error handling ─────────────────────────────────────────────────────
+  // ── Stability AI error handling ─────────────────────────────────────────────
 
-  describe("when the image provider returns a non-ok HTTP response", () => {
-    it("throws an error that includes the HTTP status code", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(false, 503, "Service Unavailable"));
+  describe("when Stability AI returns a non-ok HTTP response", () => {
+    it("throws with the Stability error payload serialised as JSON", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
 
-      await expect(generateCoverImage("Bad Gateway Title")).rejects.toThrow("503");
-    });
+      const errorResponse = {
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        json: vi.fn().mockResolvedValue({ message: "invalid prompt" }),
+        arrayBuffer: vi.fn(),
+      } as unknown as Response;
+      vi.mocked(fetch).mockResolvedValue(errorResponse);
 
-    it("throws an error that includes the HTTP status text", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(false, 503, "Service Unavailable"));
-
-      await expect(generateCoverImage("Bad Gateway Title")).rejects.toThrow(
-        "Service Unavailable",
+      await expect(generateCoverImage("Bad Prompt")).rejects.toThrow(
+        "Stability AI error:",
       );
     });
 
-    it("throws with the expected error message prefix", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(false, 429, "Too Many Requests"));
+    it("includes the serialised error body in the thrown message", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
 
-      await expect(generateCoverImage("Rate Limited Title")).rejects.toThrow(
-        "Image generation failed",
+      const errorBody = { message: "content policy violation" };
+      const errorResponse = {
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: vi.fn().mockResolvedValue(errorBody),
+        arrayBuffer: vi.fn(),
+      } as unknown as Response;
+      vi.mocked(fetch).mockResolvedValue(errorResponse);
+
+      await expect(generateCoverImage("Policy Violation")).rejects.toThrow(
+        JSON.stringify(errorBody),
       );
     });
 
-    it("throws for a 404 Not Found response", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(false, 404, "Not Found"));
+    it("does NOT call Cloudinary upload when Stability AI fails", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
 
-      await expect(generateCoverImage("Missing Endpoint")).rejects.toThrow(
-        "Image generation failed: 404 Not Found",
-      );
-    });
+      const errorResponse = {
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: vi.fn().mockResolvedValue({ error: "crash" }),
+        arrayBuffer: vi.fn(),
+      } as unknown as Response;
+      vi.mocked(fetch).mockResolvedValue(errorResponse);
 
-    it("throws for a 500 Internal Server Error response", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
-      vi.mocked(fetch).mockResolvedValue(buildFetchResponse(false, 500, "Internal Server Error"));
-
-      await expect(generateCoverImage("Server Error Title")).rejects.toThrow(
-        "Image generation failed: 500 Internal Server Error",
-      );
+      await expect(generateCoverImage("Stability Down")).rejects.toThrow();
+      expect(mockCloudinaryUpload).not.toHaveBeenCalled();
     });
   });
 
   // ── Network / upstream failure ──────────────────────────────────────────────
 
   describe("when the network call itself fails", () => {
-    it("propagates the fetch rejection (e.g. DNS failure)", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
+    it("propagates a DNS failure from fetch", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
       vi.mocked(fetch).mockRejectedValue(new Error("fetch failed"));
 
-      await expect(generateCoverImage("Network Down")).rejects.toThrow("fetch failed");
+      await expect(generateCoverImage("Network Down")).rejects.toThrow(
+        "fetch failed",
+      );
     });
 
     it("propagates a timeout error from fetch", async () => {
-      generateCoverImagePrompt.mockResolvedValue("prompt");
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
       vi.mocked(fetch).mockRejectedValue(new Error("The operation timed out"));
 
       await expect(generateCoverImage("Timeout Title")).rejects.toThrow(
         "The operation timed out",
       );
+    });
+
+    it("does NOT call Cloudinary upload when fetch throws", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockRejectedValue(new Error("network unreachable"));
+
+      await expect(generateCoverImage("No Network")).rejects.toThrow();
+      expect(mockCloudinaryUpload).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Cloudinary failure ──────────────────────────────────────────────────────
+
+  describe("when the Cloudinary upload fails", () => {
+    it("propagates the Cloudinary error", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockRejectedValue(
+        new Error("Cloudinary upload failed: invalid signature"),
+      );
+
+      await expect(generateCoverImage("Upload Fails")).rejects.toThrow(
+        "Cloudinary upload failed",
+      );
+    });
+
+    it("still calls Stability AI before the Cloudinary failure", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a nice prompt");
+      vi.mocked(fetch).mockResolvedValue(buildStabilityResponse(true));
+      mockCloudinaryUpload.mockRejectedValue(new Error("upload error"));
+
+      await expect(generateCoverImage("Order Check")).rejects.toThrow();
+      expect(fetch).toHaveBeenCalledOnce();
     });
   });
 
@@ -192,12 +309,23 @@ describe("generateCoverImage", () => {
 
   describe("when generateCoverImagePrompt itself rejects", () => {
     it("propagates the error before fetch is even called", async () => {
-      generateCoverImagePrompt.mockRejectedValue(new Error("Prompt generation failed"));
+      mockGenerateCoverImagePrompt.mockRejectedValue(
+        new Error("Prompt generation failed"),
+      );
 
       await expect(generateCoverImage("Broken Title")).rejects.toThrow(
         "Prompt generation failed",
       );
       expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call Cloudinary upload when prompt generation fails", async () => {
+      mockGenerateCoverImagePrompt.mockRejectedValue(
+        new Error("Prompt generation failed"),
+      );
+
+      await expect(generateCoverImage("Broken Title")).rejects.toThrow();
+      expect(mockCloudinaryUpload).not.toHaveBeenCalled();
     });
   });
 });

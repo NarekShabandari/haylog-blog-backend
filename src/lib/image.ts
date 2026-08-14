@@ -1,10 +1,11 @@
+import { generateCoverImagePrompt } from "@narekshabandari/haylog-blog-prompts/dist/generateImage.js";
 import cloudinary from "../config/cloudinary.js";
 
 const STABILITY_API_KEY = process.env.STABILITY_API_KEY;
 if (!STABILITY_API_KEY) throw new Error("STABILITY_API_KEY is not defined");
 
 export const generateCoverImage = async (title: string): Promise<string> => {
-  const prompt = await generateCoverImage(title);
+  const prompt = await generateCoverImagePrompt(title);
 
   const stabilityResponse = await fetch(
     "https://api.stability.ai/v2beta/stable-image/generate/core",
