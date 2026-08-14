@@ -11,8 +11,8 @@ import {
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import rateLimit from "express-rate-limit";
 
-const postCreationRateLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000,
+const postRateLimiter = rateLimit({
+  windowMs: 12 * 60 * 60 * 1000,
   limit: 1,
   message: { error: "Too many generation requests" },
 });
@@ -121,12 +121,7 @@ router.get("/my", requireAuth, getMyPostsController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post(
-  "/generate",
-  requireAuth,
-  // postCreationRateLimiter,
-  generatePostController,
-);
+router.post("/generate", requireAuth, postRateLimiter, generatePostController);
 
 /**
  * @swagger
@@ -208,7 +203,7 @@ router.get("/:slug", getPostBySlugController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/", requireAuth, createPostController);
+router.post("/", requireAuth, postRateLimiter, createPostController);
 
 /**
  * @swagger
@@ -281,7 +276,7 @@ router.post("/", requireAuth, createPostController);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.patch("/:id", requireAuth, updatePostController);
+router.patch("/:id", requireAuth, postRateLimiter, updatePostController);
 router.delete("/:id", requireAuth, deletePostController);
 
 export default router;
