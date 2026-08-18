@@ -5,7 +5,9 @@ export const generateCoverImage = async (title: string): Promise<string> => {
 
   const encodedPrompt = encodeURIComponent(prompt);
 
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1200&height=630&nologo=true&seed=${Date.now()}`;
+  const seed = Math.floor(Math.random() * 2147483647);
+
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1200&height=630&nologo=true&seed=${seed}`;
 
   return imageUrl;
 };
