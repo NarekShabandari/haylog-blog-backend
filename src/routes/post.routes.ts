@@ -7,13 +7,14 @@ import {
   updatePostController,
   deletePostController,
   generatePostController,
+  updateImageController,
 } from "../controllers/post.controller.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import rateLimit from "express-rate-limit";
 
 const postRateLimiter = rateLimit({
   windowMs: 12 * 60 * 60 * 1000,
-  limit: 1,
+  limit: 2,
   message: { error: "Too many generation requests" },
 });
 
@@ -211,6 +212,8 @@ router.post("/", requireAuth, postRateLimiter, createPostController);
  *   patch:
  *     summary: Update a post
  *     tags: [Posts]
+ *     security:
+ *       - cookieAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -218,6 +221,7 @@ router.post("/", requireAuth, postRateLimiter, createPostController);
  *         schema:
  *           type: string
  *           format: uuid
+ *         description: UUID of the post to update
  *     requestBody:
  *       required: true
  *       content:
@@ -227,10 +231,16 @@ router.post("/", requireAuth, postRateLimiter, createPostController);
  *             properties:
  *               title:
  *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 500
+ *                 example: Updated Post Title
  *               content:
  *                 type: string
+ *                 minLength: 1
+ *                 example: Updated markdown content here
  *               published:
  *                 type: boolean
+ *                 example: true
  *     responses:
  *       200:
  *         description: Post updated successfully
@@ -241,17 +251,39 @@ router.post("/", requireAuth, postRateLimiter, createPostController);
  *               properties:
  *                 message:
  *                   type: string
+ *                   example: Post updated successfully
  *                 post:
  *                   $ref: '#/components/schemas/Post'
+ *       400:
+ *         description: Validation error — no updatable fields provided or invalid UUID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       401:
  *         description: Unauthorized
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
- *   delete:
- *     summary: Delete a post
+ *       500:
+ *         description: Post not found or not authorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.patch("/:id", requireAuth, postRateLimiter, updatePostController);
+
+/**
+ * @swagger
+ * /posts/image/{id}:
+ *   patch:
+ *     summary: Regenerate and update the cover image for a post
+ *     description: Generates a new AI cover image via Pollinations using the supplied title and saves the resulting URL on the post. The caller must own the post.
  *     tags: [Posts]
+ *     security:
+ *       - cookieAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -259,6 +291,72 @@ router.post("/", requireAuth, postRateLimiter, createPostController);
  *         schema:
  *           type: string
  *           format: uuid
+ *         description: UUID of the post whose cover image should be regenerated
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title]
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 500
+ *                 description: Title used as the basis for image prompt generation
+ *                 example: Why TypeScript matters for backends
+ *     responses:
+ *       200:
+ *         description: Cover image regenerated and saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Image updated successfully
+ *                 post:
+ *                   $ref: '#/components/schemas/Post'
+ *       400:
+ *         description: Validation error — invalid UUID or missing/empty title
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Image generation failed or post not found/not authorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.patch("/image/:id", requireAuth, postRateLimiter, updateImageController);
+
+/**
+ * @swagger
+ * /posts/{id}:
+ *   delete:
+ *     summary: Delete a post
+ *     description: Permanently deletes a post. The caller must be the post author.
+ *     tags: [Posts]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID of the post to delete
  *     responses:
  *       200:
  *         description: Post deleted successfully
@@ -269,14 +367,26 @@ router.post("/", requireAuth, postRateLimiter, createPostController);
  *               properties:
  *                 message:
  *                   type: string
+ *                   example: Post deleted successfully
+ *       400:
+ *         description: Invalid UUID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       401:
  *         description: Unauthorized
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Post not found or not authorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
-router.patch("/:id", requireAuth, postRateLimiter, updatePostController);
 router.delete("/:id", requireAuth, deletePostController);
 
 export default router;

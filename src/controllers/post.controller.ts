@@ -6,6 +6,7 @@ import {
   getPostBySlugModel,
   updatePostModel,
   generateAndSavePost,
+  generatePostImage,
 } from "../models/post.model.js";
 import { sendApprovalRequest } from "../lib/telegram.js";
 
@@ -33,15 +34,25 @@ const createPostSchema = z.object({
   published: z.boolean().optional(),
 });
 
+const updateImageSchema = z.object({
+  title: z.string().min(1).max(500),
+});
+
 const updatePostSchema = z
   .object({
     title: z.string().min(1).max(500).optional(),
     content: z.string().min(1).optional(),
     published: z.boolean().optional(),
   })
-  .refine((data) => data.title !== undefined || data.content !== undefined || data.published !== undefined, {
-    message: "Nothing to update",
-  });
+  .refine(
+    (data) =>
+      data.title !== undefined ||
+      data.content !== undefined ||
+      data.published !== undefined,
+    {
+      message: "Nothing to update",
+    },
+  );
 
 export const getAllPostsController = async (
   req: Request,
@@ -140,7 +151,31 @@ export const updatePostController = async (
     next(err);
   }
 };
-
+export const updateImageController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const paramsResult = idParamSchema.safeParse(req.params);
+    if (!paramsResult.success) {
+      res.status(400).json({ error: paramsResult.error.issues });
+      return;
+    }
+    const bodyResult = updateImageSchema.safeParse(req.body);
+    if (!bodyResult.success) {
+      res.status(400).json({ error: bodyResult.error.issues });
+      return;
+    }
+    const { id } = paramsResult.data;
+    const { title } = bodyResult.data;
+    const authorId = req.session.user!.id;
+    const post = await generatePostImage(id, authorId, title);
+    res.status(200).json({ message: "Image updated successfully", post });
+  } catch (error) {
+    next(error);
+  }
+};
 export const deletePostController = async (
   req: Request,
   res: Response,

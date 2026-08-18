@@ -22,6 +22,7 @@ vi.mock("../../models/post.model.js", () => ({
   updatePostModel: vi.fn(),
   deletePostModel: vi.fn(),
   generateAndSavePost: vi.fn(),
+  generatePostImage: vi.fn(),
 }));
 
 // ── Mock telegram so no real HTTP calls are made ──────────────────────────────
@@ -39,6 +40,7 @@ const createPostModel = vi.mocked(postModel.createPostModel);
 const updatePostModel = vi.mocked(postModel.updatePostModel);
 const deletePostModel = vi.mocked(postModel.deletePostModel);
 const generateAndSavePost = vi.mocked(postModel.generateAndSavePost);
+const generatePostImage = vi.mocked(postModel.generatePostImage);
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -270,5 +272,119 @@ describe("POST /posts/generate", () => {
       message: "Post generated and sent for approval via Telegram",
       post: expect.objectContaining({ id: mockPost.id }),
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("PATCH /posts/image/:id", () => {
+  it("returns 401 when not authenticated", async () => {
+    const res = await request(buildApp())
+      .patch(`/posts/image/${mockPost.id}`)
+      .send({ title: "New Cover Title" });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ error: "Not authenticated" });
+  });
+
+  it("returns 400 when id is not a valid UUID", async () => {
+    const agent = await loggedInAgent();
+
+    const res = await agent
+      .patch("/posts/image/not-a-uuid")
+      .send({ title: "New Cover Title" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeInstanceOf(Array);
+  });
+
+  it("returns 400 when title is missing", async () => {
+    const agent = await loggedInAgent();
+
+    const res = await agent
+      .patch(`/posts/image/${mockPost.id}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeInstanceOf(Array);
+    expect(generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when title is an empty string", async () => {
+    const agent = await loggedInAgent();
+
+    const res = await agent
+      .patch(`/posts/image/${mockPost.id}`)
+      .send({ title: "" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeInstanceOf(Array);
+  });
+
+  it("returns 200 with updated post on success", async () => {
+    generatePostImage.mockResolvedValue(mockPost);
+    const agent = await loggedInAgent();
+
+    const res = await agent
+      .patch(`/posts/image/${mockPost.id}`)
+      .send({ title: "New Cover Title" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      message: "Image updated successfully",
+      post: expect.objectContaining({ id: mockPost.id }),
+    });
+  });
+
+  it("returns 500 when generatePostImage throws", async () => {
+    generatePostImage.mockRejectedValue(new Error("Image generation failed"));
+    const agent = await loggedInAgent();
+
+    const res = await agent
+      .patch(`/posts/image/${mockPost.id}`)
+      .send({ title: "New Cover Title" });
+
+    expect(res.status).toBe(500);
+    expect(res.body).toMatchObject({ error: "Image generation failed" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("DELETE /posts/:id", () => {
+  it("returns 401 when not authenticated", async () => {
+    const res = await request(buildApp()).delete(`/posts/${mockPost.id}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ error: "Not authenticated" });
+  });
+
+  it("returns 400 when id is not a valid UUID", async () => {
+    const agent = await loggedInAgent();
+
+    const res = await agent.delete("/posts/not-a-uuid");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeInstanceOf(Array);
+  });
+
+  it("returns 200 on successful delete", async () => {
+    deletePostModel.mockResolvedValue(undefined);
+    const agent = await loggedInAgent();
+
+    const res = await agent.delete(`/posts/${mockPost.id}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ message: "Post deleted successfully" });
+  });
+
+  it("returns 500 when post is not found or not authorized", async () => {
+    deletePostModel.mockRejectedValue(
+      new Error("Post not found or not authorized"),
+    );
+    const agent = await loggedInAgent();
+
+    const res = await agent.delete(`/posts/${mockPost.id}`);
+
+    expect(res.status).toBe(500);
+    expect(res.body).toMatchObject({ error: "Post not found or not authorized" });
   });
 });

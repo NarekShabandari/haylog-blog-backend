@@ -9,6 +9,7 @@ vi.mock("../models/post.model.js", () => ({
   updatePostModel: vi.fn(),
   deletePostModel: vi.fn(),
   generateAndSavePost: vi.fn(),
+  generatePostImage: vi.fn(),
 }));
 
 // ── Mock telegram so no real HTTP calls are made ──────────────────────────────
@@ -24,6 +25,7 @@ import {
   updatePostController,
   deletePostController,
   generatePostController,
+  updateImageController,
 } from "../controllers/post.controller.js";
 import * as postModel from "../models/post.model.js";
 
@@ -33,6 +35,7 @@ const createPostModel = vi.mocked(postModel.createPostModel);
 const updatePostModel = vi.mocked(postModel.updatePostModel);
 const deletePostModel = vi.mocked(postModel.deletePostModel);
 const generateAndSavePost = vi.mocked(postModel.generateAndSavePost);
+const generatePostImage = vi.mocked(postModel.generatePostImage);
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -317,5 +320,117 @@ describe("generatePostController", () => {
     await generatePostController(req as any, buildRes() as any, next);
 
     expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("updateImageController", () => {
+  it("returns 400 when id param is not a valid UUID", async () => {
+    const req = buildReq({
+      params: { id: "not-a-uuid" },
+      body: { title: "Valid Title" },
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await updateImageController(req as any, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Array) }),
+    );
+    expect(generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when title is missing from the body", async () => {
+    const req = buildReq({
+      params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
+      body: {},
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await updateImageController(req as any, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Array) }),
+    );
+    expect(generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when title is an empty string", async () => {
+    const req = buildReq({
+      params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
+      body: { title: "" },
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await updateImageController(req as any, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 with the updated post on success", async () => {
+    generatePostImage.mockResolvedValue(mockPost);
+    const req = buildReq({
+      params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
+      body: { title: "A New Cover Title" },
+      session: { user: mockUser },
+    });
+    const res = buildRes();
+    const next = buildNext();
+
+    await updateImageController(req as any, res as any, next);
+
+    expect(generatePostImage).toHaveBeenCalledWith(
+      "a1b2c3d4-e5f6-4789-abcd-ef1234567890",
+      mockUser.id,
+      "A New Cover Title",
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Image updated successfully",
+      post: mockPost,
+    });
+  });
+
+  it("calls next when generatePostImage throws", async () => {
+    generatePostImage.mockRejectedValue(new Error("Image generation failed"));
+    const next = buildNext();
+
+    await updateImageController(
+      buildReq({
+        params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
+        body: { title: "A Title" },
+        session: { user: mockUser },
+      }) as any,
+      buildRes() as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it("passes the session user id as authorId", async () => {
+    generatePostImage.mockResolvedValue(mockPost);
+    const req = buildReq({
+      params: { id: "a1b2c3d4-e5f6-4789-abcd-ef1234567890" },
+      body: { title: "Title" },
+      session: { user: mockUser },
+    });
+
+    await updateImageController(req as any, buildRes() as any, buildNext());
+
+    expect(generatePostImage).toHaveBeenCalledWith(
+      expect.any(String),
+      mockUser.id,
+      expect.any(String),
+    );
   });
 });

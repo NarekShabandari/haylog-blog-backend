@@ -184,3 +184,58 @@ describe("deletePost", () => {
     expect(result).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("updateImage", () => {
+  it("imports updateImage from the query module", async () => {
+    // Dynamically import after the vi.mock above has taken effect
+    const mod = await import("../db/queries/posts.js");
+    expect(mod.updateImage).toBeDefined();
+  });
+
+  it("issues an UPDATE with the correct SQL and parameters", async () => {
+    const { updateImage } = await import("../db/queries/posts.js");
+    poolQuery.mockResolvedValue({ rows: [mockPost] } as any);
+
+    await updateImage("post-uuid-1", "user-uuid-1", "https://example.com/img.webp");
+
+    expect(poolQuery).toHaveBeenCalledOnce();
+    const [sql, params] = getCall();
+    expect(sql).toMatch(/UPDATE posts/i);
+    expect(sql).toMatch(/SET cover_image=\$1/i);
+    expect(sql).toMatch(/WHERE id=\$2 AND author_id=\$3/i);
+    expect(params).toEqual([
+      "https://example.com/img.webp",
+      "post-uuid-1",
+      "user-uuid-1",
+    ]);
+  });
+
+  it("returns the updated post row", async () => {
+    const { updateImage } = await import("../db/queries/posts.js");
+    poolQuery.mockResolvedValue({ rows: [mockPost] } as any);
+
+    const result = await updateImage("post-uuid-1", "user-uuid-1", "https://example.com/img.webp");
+
+    expect(result).toEqual(mockPost);
+  });
+
+  it("returns null when no matching post is found (wrong id or author)", async () => {
+    const { updateImage } = await import("../db/queries/posts.js");
+    poolQuery.mockResolvedValue({ rows: [] } as any);
+
+    const result = await updateImage("bad-id", "user-uuid-1", "https://example.com/img.webp");
+
+    expect(result).toBeNull();
+  });
+
+  it("uses RETURNING * so the full post is available without a second query", async () => {
+    const { updateImage } = await import("../db/queries/posts.js");
+    poolQuery.mockResolvedValue({ rows: [mockPost] } as any);
+
+    await updateImage("post-uuid-1", "user-uuid-1", "https://example.com/img.webp");
+
+    const [sql] = getCall();
+    expect(sql).toMatch(/RETURNING \*/i);
+  });
+});

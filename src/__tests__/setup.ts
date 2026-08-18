@@ -4,8 +4,6 @@
 // any exported function is called).  Without these stubs the modules throw on
 // import and no test can even load.
 
-process.env.STABILITY_API_KEY = "test-stability-key";
-
 // Cloudinary vars — required by src/config/cloudinary.ts
 process.env.CLOUDINARY_CLOUD_NAME = "test-cloud";
 process.env.CLOUDINARY_API_KEY = "test-api-key";

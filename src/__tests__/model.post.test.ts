@@ -164,3 +164,97 @@ describe("deletePostModel", () => {
     ).rejects.toThrow("Post not found or not authorized");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// generatePostImage — tested below with its own mocks for image + updateImage
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Re-declare the mocks that were already hoisted above, plus add the new ones.
+// vi.mock calls are hoisted by Vitest, so we extend the existing mock factory
+// by importing the module and adding spies rather than a second vi.mock call.
+
+vi.mock("../lib/image.js", () => ({
+  generateCoverImage: vi.fn(),
+}));
+
+// updateImage is part of the already-mocked posts query module — we just need
+// to expose it on the existing mock object.
+vi.mock("../db/queries/posts.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../db/queries/posts.js")>();
+  return {
+    ...original,
+    createPost: vi.fn(),
+    getAllPosts: vi.fn(),
+    getPostBySlug: vi.fn(),
+    updatePost: vi.fn(),
+    deletePost: vi.fn(),
+    updateImage: vi.fn(),
+  };
+});
+
+import { generatePostImage } from "../models/post.model.js";
+import * as imageLib from "../lib/image.js";
+import * as postsQueriesExtended from "../db/queries/posts.js";
+
+const generateCoverImage = vi.mocked(imageLib.generateCoverImage);
+const updateImageQuery = vi.mocked(postsQueriesExtended.updateImage);
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("generatePostImage", () => {
+  it("calls generateCoverImage with the supplied title", async () => {
+    generateCoverImage.mockResolvedValue("https://image.pollinations.ai/prompt/abc");
+    updateImageQuery.mockResolvedValue(mockPost);
+
+    await generatePostImage("post-uuid-1", "user-uuid-1", "My Blog Post");
+
+    expect(generateCoverImage).toHaveBeenCalledOnce();
+    expect(generateCoverImage).toHaveBeenCalledWith("My Blog Post");
+  });
+
+  it("calls updateImage with the generated URL, post id, and author id", async () => {
+    const fakeUrl = "https://image.pollinations.ai/prompt/encoded-prompt";
+    generateCoverImage.mockResolvedValue(fakeUrl);
+    updateImageQuery.mockResolvedValue(mockPost);
+
+    await generatePostImage("post-uuid-1", "user-uuid-1", "My Blog Post");
+
+    expect(updateImageQuery).toHaveBeenCalledOnce();
+    expect(updateImageQuery).toHaveBeenCalledWith("post-uuid-1", "user-uuid-1", fakeUrl);
+  });
+
+  it("returns the updated post from updateImage", async () => {
+    generateCoverImage.mockResolvedValue("https://image.pollinations.ai/prompt/x");
+    updateImageQuery.mockResolvedValue(mockPost);
+
+    const result = await generatePostImage("post-uuid-1", "user-uuid-1", "Title");
+
+    expect(result).toEqual(mockPost);
+  });
+
+  it("returns null when no post matches the id / author combination", async () => {
+    generateCoverImage.mockResolvedValue("https://image.pollinations.ai/prompt/x");
+    updateImageQuery.mockResolvedValue(null);
+
+    const result = await generatePostImage("bad-id", "user-uuid-1", "Title");
+
+    expect(result).toBeNull();
+  });
+
+  it("propagates errors thrown by generateCoverImage", async () => {
+    generateCoverImage.mockRejectedValue(new Error("Prompt generation failed"));
+
+    await expect(
+      generatePostImage("post-uuid-1", "user-uuid-1", "Title"),
+    ).rejects.toThrow("Prompt generation failed");
+    expect(updateImageQuery).not.toHaveBeenCalled();
+  });
+
+  it("propagates errors thrown by updateImage", async () => {
+    generateCoverImage.mockResolvedValue("https://image.pollinations.ai/prompt/x");
+    updateImageQuery.mockRejectedValue(new Error("DB error"));
+
+    await expect(
+      generatePostImage("post-uuid-1", "user-uuid-1", "Title"),
+    ).rejects.toThrow("DB error");
+  });
+});
