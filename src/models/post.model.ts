@@ -4,6 +4,7 @@ import {
   getPostBySlug,
   updatePost,
   deletePost,
+  updateImage,
 } from "../db/queries/posts.js";
 import { generatePost } from "../lib/anthropic.js";
 import { CreatePostInput, Post } from "../types/index.js";
@@ -91,4 +92,13 @@ export const generateAndSavePost = async (
     meta_description_hy: translated.meta_description_hy,
     cover_image,
   });
+};
+
+export const generatePostImage = async (
+  id: string,
+  authorId: string,
+  title: string,
+): Promise<Post | null> => {
+  const cover_image = await generateCoverImage(title);
+  return await updateImage(id, authorId, cover_image);
 };

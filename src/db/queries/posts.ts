@@ -88,3 +88,17 @@ export const deletePost = async (
   );
   return (rowCount ?? 0) > 0;
 };
+
+export const updateImage = async (
+  id: string,
+  authorId: string,
+  cover_image: string,
+): Promise<Post | null> => {
+  const { rows } = await pool.query<Post>(
+    `UPDATE posts SET cover_image=$1
+    WHERE id=$2 AND author_id=$3
+    RETURNING *`,
+    [cover_image, id, authorId],
+  );
+  return rows[0] || null;
+};
