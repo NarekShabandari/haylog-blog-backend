@@ -1,5 +1,5 @@
 import { HfInference } from "@huggingface/inference";
-import cloudinary from "../config/cloudinary";
+import cloudinary from "../config/cloudinary.js";
 import { generateCoverImagePrompt } from "@narekshabandari/haylog-blog-prompts/dist/generateImage";
 
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
