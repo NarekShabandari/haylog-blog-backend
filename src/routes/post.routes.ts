@@ -14,7 +14,7 @@ import rateLimit from "express-rate-limit";
 
 const postRateLimiter = rateLimit({
   windowMs: 12 * 60 * 60 * 1000,
-  limit: 10,
+  limit: 2,
   message: { error: "Too many generation requests" },
 });
 
