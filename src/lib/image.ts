@@ -12,7 +12,6 @@ export const generateCoverImage = async (title: string): Promise<string> => {
     inputs: prompt,
   });
 
-  // convert to buffer and upload to Cloudinary
   // @ts-ignore
   const buffer = Buffer.from(await blob.arrayBuffer());
   const base64 = `data:image/png;base64,${buffer.toString("base64")}`;
