@@ -25,6 +25,7 @@
   "homepage": "https://github.com/NarekShabandari/haylog-blog-backend#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
+    "@huggingface/inference": "^4.13.28",
     "@narekshabandari/haylog-blog-prompts": "^1.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
