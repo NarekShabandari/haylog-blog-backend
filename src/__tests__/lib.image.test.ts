@@ -1,19 +1,49 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// ── Hoisted mocks (must be declared before vi.mock factories) ─────────────────
+const { mockTextToImage, mockUpload, mockGenerateCoverImagePrompt } =
+  vi.hoisted(() => ({
+    mockTextToImage: vi.fn(),
+    mockUpload: vi.fn(),
+    mockGenerateCoverImagePrompt: vi.fn(),
+  }));
+
 // ── Mock: external prompt generator ──────────────────────────────────────────
 vi.mock("@narekshabandari/haylog-blog-prompts/dist/generateImage", () => ({
-  generateCoverImagePrompt: vi.fn(),
+  generateCoverImagePrompt: mockGenerateCoverImagePrompt,
+}));
+
+// ── Mock: HuggingFace inference ───────────────────────────────────────────────
+vi.mock("@huggingface/inference", () => ({
+  HfInference: function () {
+    return { textToImage: mockTextToImage };
+  },
+}));
+
+// ── Mock: Cloudinary ──────────────────────────────────────────────────────────
+vi.mock("../config/cloudinary", () => ({
+  default: {
+    uploader: {
+      upload: mockUpload,
+    },
+  },
 }));
 
 import { generateCoverImage } from "../lib/image.js";
-import * as generateImageModule from "@narekshabandari/haylog-blog-prompts/dist/generateImage";
 
-const mockGenerateCoverImagePrompt = vi.mocked(
-  generateImageModule.generateCoverImagePrompt,
-);
+// A minimal Blob-like object whose arrayBuffer() returns an empty buffer
+const makeFakeBlob = () => ({
+  arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+});
+
+const FAKE_SECURE_URL =
+  "https://res.cloudinary.com/demo/image/upload/blog-covers/test.jpg";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default happy-path stubs
+  mockTextToImage.mockResolvedValue(makeFakeBlob());
+  mockUpload.mockResolvedValue({ secure_url: FAKE_SECURE_URL });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,13 +51,13 @@ describe("generateCoverImage", () => {
   // ── Happy path ──────────────────────────────────────────────────────────────
 
   describe("when everything succeeds", () => {
-    it("returns a Pollinations URL string", async () => {
+    it("returns the Cloudinary secure_url", async () => {
       mockGenerateCoverImagePrompt.mockResolvedValue("a nice AI art prompt");
 
       const result = await generateCoverImage("My Blog Post");
 
       expect(typeof result).toBe("string");
-      expect(result).toMatch(/^https:\/\/image\.pollinations\.ai\/prompt\//);
+      expect(result).toBe(FAKE_SECURE_URL);
     });
 
     it("passes the post title to generateCoverImagePrompt", async () => {
@@ -41,45 +71,63 @@ describe("generateCoverImage", () => {
       );
     });
 
-    it("URL-encodes the prompt returned by generateCoverImagePrompt", async () => {
-      const rawPrompt = "a prompt with spaces & special chars!";
-      mockGenerateCoverImagePrompt.mockResolvedValue(rawPrompt);
+    it("passes the prompt returned by generateCoverImagePrompt to textToImage", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("a custom art prompt");
 
-      const result = await generateCoverImage("Special Chars");
+      await generateCoverImage("Some Title");
 
-      expect(result).toContain(encodeURIComponent(rawPrompt));
+      expect(mockTextToImage).toHaveBeenCalledOnce();
+      expect(mockTextToImage).toHaveBeenCalledWith(
+        expect.objectContaining({ inputs: "a custom art prompt" }),
+      );
     });
 
-    it("includes width=1200 in the query string", async () => {
+    it("uses the correct Stable Diffusion model", async () => {
       mockGenerateCoverImagePrompt.mockResolvedValue("some prompt");
 
-      const result = await generateCoverImage("Width Check");
+      await generateCoverImage("Model Check");
 
-      expect(result).toContain("width=1200");
+      expect(mockTextToImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "stabilityai/stable-diffusion-xl-base-1.0",
+        }),
+      );
     });
 
-    it("includes height=630 in the query string", async () => {
+    it("uploads to Cloudinary with width=1200 and height=630", async () => {
       mockGenerateCoverImagePrompt.mockResolvedValue("some prompt");
 
-      const result = await generateCoverImage("Height Check");
+      await generateCoverImage("Dimension Check");
 
-      expect(result).toContain("height=630");
+      expect(mockUpload).toHaveBeenCalledOnce();
+      expect(mockUpload).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          transformation: expect.arrayContaining([
+            expect.objectContaining({ width: 1200, height: 630 }),
+          ]),
+        }),
+      );
     });
 
-    it("includes nologo=true in the query string", async () => {
+    it("uploads to the blog-covers folder in Cloudinary", async () => {
       mockGenerateCoverImagePrompt.mockResolvedValue("some prompt");
 
-      const result = await generateCoverImage("No Logo Check");
+      await generateCoverImage("Folder Check");
 
-      expect(result).toContain("nologo=true");
+      expect(mockUpload).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ folder: "blog-covers" }),
+      );
     });
 
-    it("includes a numeric seed in the query string", async () => {
+    it("uploads a base64 data URI to Cloudinary", async () => {
       mockGenerateCoverImagePrompt.mockResolvedValue("some prompt");
 
-      const result = await generateCoverImage("Seed Check");
+      await generateCoverImage("Base64 Check");
 
-      expect(result).toMatch(/seed=\d+/);
+      const [uploadArg] = mockUpload.mock.calls[0];
+      expect(uploadArg).toMatch(/^data:image\/png;base64,/);
     });
 
     it("calls generateCoverImagePrompt exactly once per invocation", async () => {
@@ -90,30 +138,20 @@ describe("generateCoverImage", () => {
       expect(mockGenerateCoverImagePrompt).toHaveBeenCalledOnce();
     });
 
-    it("does not make any network requests (no fetch calls)", async () => {
-      const fetchSpy = vi.spyOn(global, "fetch");
-      mockGenerateCoverImagePrompt.mockResolvedValue("some prompt");
+    it("calls textToImage exactly once per invocation", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("prompt");
 
-      await generateCoverImage("No Network");
+      await generateCoverImage("HF Once Only");
 
-      expect(fetchSpy).not.toHaveBeenCalled();
-      fetchSpy.mockRestore();
+      expect(mockTextToImage).toHaveBeenCalledOnce();
     });
 
-    it("returns different URLs on successive calls due to seed", async () => {
-      mockGenerateCoverImagePrompt.mockResolvedValue("same prompt");
+    it("calls cloudinary upload exactly once per invocation", async () => {
+      mockGenerateCoverImagePrompt.mockResolvedValue("prompt");
 
-      // Advance time between calls so Date.now() differs
-      const dateSpy = vi
-        .spyOn(Date, "now")
-        .mockReturnValueOnce(1000)
-        .mockReturnValueOnce(2000);
+      await generateCoverImage("Cloudinary Once Only");
 
-      const url1 = await generateCoverImage("Title A");
-      const url2 = await generateCoverImage("Title A");
-
-      expect(url1).not.toBe(url2);
-      dateSpy.mockRestore();
+      expect(mockUpload).toHaveBeenCalledOnce();
     });
   });
 
